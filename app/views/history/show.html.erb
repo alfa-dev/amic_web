@@ -1,0 +1,211 @@
+<% content_for :title, "Conversa — Amic" %>
+<% content_for :head do %>
+<style>
+  :root { --bg:#0d0d0f; --surface:#16161a; --surface2:#1e1e24; --accent:#7c6af5; --text:#ccccdd; --text-muted:#555566; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; min-height:100dvh; padding:32px 16px; }
+
+  .top-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:28px; max-width:680px; margin-left:auto; margin-right:auto; }
+  .top-left { display:flex; align-items:center; gap:16px; }
+  .back-link { color:var(--text-muted); text-decoration:none; font-size:0.8rem; transition:color 0.2s; }
+  .back-link:hover { color:var(--text); }
+
+  .btn-analyze {
+    padding:8px 16px; background:transparent; border:1px solid var(--accent);
+    border-radius:8px; color:var(--accent); font-family:'Courier New',monospace;
+    font-size:0.7rem; letter-spacing:0.1em; cursor:pointer; transition:background 0.2s;
+  }
+  .btn-analyze:hover { background:rgba(124,106,245,0.1); }
+  .btn-analyze:disabled { opacity:0.4; cursor:not-allowed; }
+
+  .session-meta {
+    max-width:680px; margin:0 auto 24px;
+    background:var(--surface); border-radius:12px; padding:16px 20px;
+    display:flex; flex-wrap:wrap; gap:16px;
+    font-size:0.68rem; color:var(--text-muted);
+  }
+  .session-meta b { color:var(--text); }
+
+  /* Analysis panel */
+  #analysis-panel {
+    max-width:680px; margin:0 auto 28px;
+    background:var(--surface); border:1px solid #2a2a3a;
+    border-radius:14px; overflow:hidden;
+    display:none;
+  }
+  #analysis-panel.visible { display:block; }
+
+  .analysis-header {
+    padding:14px 20px; border-bottom:1px solid #1e1e28;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .analysis-header h3 { font-size:0.7rem; letter-spacing:0.25em; text-transform:uppercase; color:var(--text-muted); }
+  .analysis-close { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; }
+  .analysis-close:hover { color:var(--text); }
+
+  .analysis-loading { padding:32px; text-align:center; color:var(--text-muted); font-size:0.8rem; }
+
+  .analysis-body { padding:20px; display:flex; flex-direction:column; gap:18px; }
+
+  .analysis-section { display:flex; flex-direction:column; gap:6px; }
+  .analysis-label { font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); }
+  .analysis-value { font-size:0.8rem; line-height:1.6; color:var(--text); }
+
+  .tag-list { display:flex; flex-wrap:wrap; gap:6px; }
+  .tag {
+    padding:3px 10px; border-radius:999px;
+    background:var(--surface2); border:1px solid #2a2a35;
+    font-size:0.68rem; color:var(--text);
+  }
+
+  .analysis-error { padding:20px; color:#bb5555; font-size:0.8rem; }
+
+  /* Messages */
+  .messages { max-width:680px; margin:0 auto; display:flex; flex-direction:column; gap:12px; }
+
+  .msg { display:flex; flex-direction:column; gap:4px; max-width:85%; }
+  .msg.user      { align-self:flex-end; align-items:flex-end; }
+  .msg.assistant { align-self:flex-start; align-items:flex-start; }
+
+  .msg-bubble { padding:10px 14px; border-radius:14px; font-size:0.82rem; line-height:1.5; }
+  .msg.user .msg-bubble      { background:var(--accent); color:#fff; border-bottom-right-radius:4px; }
+  .msg.assistant .msg-bubble { background:var(--surface); color:var(--text); border:1px solid #222230; border-bottom-left-radius:4px; }
+
+  .msg-meta { font-size:0.6rem; color:var(--text-muted); display:flex; gap:8px; }
+  .emotion-tag { font-size:0.58rem; letter-spacing:0.1em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:var(--surface2); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--text-muted); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:middle; margin-right:6px; }
+</style>
+<% end %>
+
+<div class="top-bar">
+  <div class="top-left">
+    <%= link_to '← histórico', '/history', class: 'back-link' %>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="/history/<%= @session.id %>/export" class="btn-analyze" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+      ↓ Baixar log
+    </a>
+    <button class="btn-analyze" id="btn-analyze" data-session-id="<%= @session.id %>">
+      Analisar conversa
+    </button>
+  </div>
+</div>
+
+<div class="session-meta">
+  <span>Início: <b><%= @session.created_at.strftime('%d/%m/%Y às %H:%M') %></b></span>
+  <% if @session.ended_at %>
+    <span>Duração: <b><%= @session.duration_minutes %> min</b></span>
+  <% end %>
+  <span>Mensagens: <b><%= @messages.size %></b></span>
+  <% if @session.emotion_start %>
+    <span>Emoção início: <b><%= @session.emotion_start %></b></span>
+  <% end %>
+  <% if @session.emotion_end %>
+    <span>Emoção fim: <b><%= @session.emotion_end %></b></span>
+  <% end %>
+  <% if @session.stamina_end %>
+    <span>Stamina final: <b><%= @session.stamina_end %>/100</b></span>
+  <% end %>
+  <span><%= link_to 'configurar chave de análise', '/app_settings', style: 'color: var(--text-muted)' %></span>
+</div>
+
+<!-- Analysis panel -->
+<div id="analysis-panel">
+  <div class="analysis-header">
+    <h3>Análise da conversa</h3>
+    <button class="analysis-close" id="analysis-close">✕</button>
+  </div>
+  <div id="analysis-content">
+    <div class="analysis-loading"><span class="spinner"></span>Analisando...</div>
+  </div>
+</div>
+
+<!-- Messages -->
+<div class="messages">
+  <% @messages.each do |msg| %>
+    <% emotion = @session.emotion_label(msg.emotion_points || 50) %>
+    <div class="msg <%= msg.role %>">
+      <div class="msg-bubble"><%= msg.content %></div>
+      <div class="msg-meta">
+        <span><%= msg.created_at.strftime('%H:%M') %></span>
+        <% if msg.emotion_points %>
+          <span class="emotion-tag"><%= emotion %> (<%= msg.emotion_points %>)</span>
+        <% end %>
+        <% if msg.stamina %>
+          <span>⚡ <%= msg.stamina %></span>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<script>
+  const btn     = document.getElementById('btn-analyze');
+  const panel   = document.getElementById('analysis-panel');
+  const content = document.getElementById('analysis-content');
+  const closeBtn = document.getElementById('analysis-close');
+  const sessionId = btn.dataset.sessionId;
+
+  closeBtn.addEventListener('click', () => {
+    panel.classList.remove('visible');
+  });
+
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = 'Analisando...';
+    panel.classList.add('visible');
+    content.innerHTML = '<div class="analysis-loading"><span class="spinner"></span>Analisando com Claude...</div>';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+      const res = await fetch(`/history/${sessionId}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+        }
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        content.innerHTML = `<div class="analysis-error">Erro: ${data.error}</div>`;
+        return;
+      }
+
+      content.innerHTML = renderAnalysis(data);
+    } catch (e) {
+      content.innerHTML = `<div class="analysis-error">Erro ao conectar. Tente novamente.</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Analisar conversa';
+    }
+  });
+
+  function renderAnalysis(d) {
+    const section = (label, value) => `
+      <div class="analysis-section">
+        <div class="analysis-label">${label}</div>
+        <div class="analysis-value">${value}</div>
+      </div>`;
+
+    const tags = (label, items) => `
+      <div class="analysis-section">
+        <div class="analysis-label">${label}</div>
+        <div class="tag-list">${(items || []).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+      </div>`;
+
+    return `<div class="analysis-body">
+      ${section('Resumo', d.resumo || '—')}
+      ${tags('Tópicos discutidos', d.topicos)}
+      ${section('Arco emocional do Amic', d.arco_emocional || '—')}
+      ${section('Perfil do usuário', d.perfil_usuario || '—')}
+      ${tags('O que Amic aprendeu', d.aprendizados)}
+      ${section('Qualidade da interação', d.qualidade || '—')}
+      ${section('Padrões observados', d.padroes || '—')}
+      ${tags('Sugestões para próximas conversas', d.sugestoes)}
+    </div>`;
+  }
+</script>

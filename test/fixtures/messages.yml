@@ -1,0 +1,15 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  chat_session: one
+  role: MyString
+  content: MyText
+  emotion_points: 1
+  stamina: 1
+
+two:
+  chat_session: two
+  role: MyString
+  content: MyText
+  emotion_points: 1
+  stamina: 1

@@ -1,0 +1,469 @@
+<% content_for :title, "Amic" %>
+<% content_for :head do %>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --face-color: #e0e0ff;
+    --accent: #7c6af5;
+    --text-muted: #555566;
+    --text: #ccccdd;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #robot-name {
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  #face-wrap {
+    filter: drop-shadow(0 0 32px rgba(124,106,245,0.18));
+  }
+
+  #bip-face {
+    display: block;
+    width: min(80vw, 360px);
+    height: min(80vw, 360px);
+  }
+
+
+  .emotion-label { font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; margin-top: 10px; transition: color 0.5s; }
+  .emotion-euphoric { color: #f5c842; }
+  .emotion-happy    { color: #7c6af5; }
+  .emotion-neutral  { color: var(--text-muted); }
+  .emotion-sad      { color: #5588bb; }
+  .emotion-grumpy   { color: #bb5555; }
+
+  #points-label { display: none; font-size: 0.6rem; color: var(--text-muted); margin-top: 4px; }
+
+  #status-label { font-size: 0.7rem; color: var(--text-muted); min-height: 1.2em; margin-top: 18px; letter-spacing: 0.1em; }
+
+  #mic-btn {
+    margin-top: 28px;
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: transparent;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  #mic-btn:hover { background: rgba(124,106,245,0.1); }
+  #mic-btn.listening { background: rgba(124,106,245,0.2); animation: pulse 1.2s infinite; }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(124,106,245,0.5); }
+    70%  { box-shadow: 0 0 0 20px rgba(124,106,245,0); }
+    100% { box-shadow: 0 0 0 0 rgba(124,106,245,0); }
+  }
+
+  #mic-btn svg { width: 28px; height: 28px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  #conversation { margin-top: 20px; width: min(90vw, 400px); text-align: center; }
+  #transcript   { font-size: 0.72rem; color: var(--text-muted); min-height: 1.2em; }
+  #response     { font-size: 0.82rem; color: var(--text); margin-top: 6px; min-height: 1.4em; line-height: 1.5; }
+
+  /* top-right nav */
+  .top-nav { position: fixed; top: 14px; right: 14px; display: flex; gap: 6px; }
+  .nav-btn {
+    width: 34px; height: 34px;
+    border: none; background: transparent;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    opacity: 0.35; transition: opacity 0.2s, transform 0.3s;
+    text-decoration: none;
+  }
+  .nav-btn:hover { opacity: 1; }
+  .nav-btn.open  { opacity: 1; transform: rotate(90deg); }
+  .nav-btn svg   { width: 19px; height: 19px; stroke: var(--text); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Settings panel */
+  #settings-panel {
+    position: fixed; top: 0; right: 0;
+    height: 100dvh; width: min(340px, 90vw);
+    background: var(--surface);
+    border-left: 1px solid #222230;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    z-index: 100; overflow-y: auto;
+  }
+  #settings-panel.open { transform: translateX(0); }
+
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 16px; border-bottom: 1px solid #222230; }
+  .panel-header h2 { font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-muted); }
+  #panel-close { background: transparent; border: none; cursor: pointer; color: var(--text-muted); font-size: 1.1rem; padding: 4px; transition: color 0.2s; }
+  #panel-close:hover { color: var(--text); }
+
+  .panel-section { padding: 14px 20px; border-bottom: 1px solid #1a1a22; display: flex; flex-direction: column; gap: 8px; }
+  .panel-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); }
+  .panel-hint  { font-size: 0.62rem; color: var(--text-muted); opacity: 0.7; }
+  .panel-row   { display: flex; align-items: center; justify-content: space-between; }
+
+  .panel-input, .panel-select {
+    background: var(--surface2); border: 1px solid #2a2a35; border-radius: 8px;
+    padding: 10px 12px; color: var(--text);
+    font-family: 'Courier New', monospace; font-size: 0.8rem;
+    width: 100%; outline: none; transition: border-color 0.2s;
+  }
+  .panel-input:focus { border-color: var(--accent); }
+  .panel-range { width: 100%; accent-color: var(--accent); }
+
+  .toggle { position: relative; width: 40px; height: 22px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track { position: absolute; inset: 0; background: #2a2a35; border-radius: 11px; cursor: pointer; transition: background 0.2s; }
+  .toggle input:checked + .toggle-track { background: var(--accent); }
+  .toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: transform 0.2s; }
+  .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
+
+  .btn-save {
+    margin: 16px 20px; padding: 11px;
+    background: var(--accent); border: none; border-radius: 8px;
+    color: white; font-family: 'Courier New', monospace;
+    font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .btn-save:hover { background: #6a59e0; }
+
+  .btn-reset {
+    margin: 0 20px 20px; padding: 10px;
+    background: transparent; border: 1px solid #4a1a1a; border-radius: 8px;
+    color: #bb5555; font-family: 'Courier New', monospace;
+    font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .btn-reset:hover { background: #1a0a0a; }
+
+  .panel-info { margin: 0 20px 16px; padding: 12px; background: var(--surface2); border-radius: 8px; font-size: 0.6rem; color: var(--text-muted); line-height: 1.8; }
+
+  #settings-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99; }
+  #settings-overlay.open { display: block; }
+
+  #save-toast {
+    position: fixed; bottom: 32px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent); color: white;
+    font-size: 0.75rem; padding: 10px 24px; border-radius: 999px;
+    opacity: 0; transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none; z-index: 200;
+  }
+  #save-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+<% end %>
+
+<div id="robot-name">Amic</div>
+
+<div id="face-wrap">
+  <canvas id="bip-face"></canvas>
+</div>
+
+<div id="emotion-label" class="emotion-label emotion-neutral">neutro</div>
+<div id="points-label"></div>
+<div id="status-label"></div>
+
+<button id="mic-btn" aria-label="Falar com Amic">
+  <svg viewBox="0 0 24 24">
+    <rect x="9" y="2" width="6" height="11" rx="3"/>
+    <path d="M5 10a7 7 0 0 0 14 0"/>
+    <line x1="12" y1="19" x2="12" y2="23"/>
+    <line x1="8"  y1="23" x2="16" y2="23"/>
+  </svg>
+</button>
+
+<div id="conversation">
+  <div id="transcript"></div>
+  <div id="response"></div>
+</div>
+
+<!-- Top nav -->
+<div class="top-nav">
+  <a href="/history" class="nav-btn" title="Histórico">
+    <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+  </a>
+  <button id="settings-btn" class="nav-btn" title="Configurações">
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+</div>
+
+<!-- Settings overlay -->
+<div id="settings-overlay"></div>
+
+<!-- Settings panel -->
+<div id="settings-panel" role="dialog" aria-label="Configurações">
+  <div class="panel-header">
+    <h2>Configurações</h2>
+    <button id="panel-close">✕</button>
+  </div>
+
+  <div class="panel-section">
+    <label class="panel-label" for="cfg-api-key">Chave da API Claude</label>
+    <input id="cfg-api-key" type="password" class="panel-input" placeholder="sk-ant-..." autocomplete="off" />
+    <span class="panel-hint">Salva apenas no seu navegador.</span>
+  </div>
+
+  <div class="panel-section">
+    <label class="panel-label" for="cfg-name">Nome do robô</label>
+    <input id="cfg-name" type="text" class="panel-input" placeholder="Amic" />
+  </div>
+
+  <div class="panel-section">
+    <label class="panel-label" for="cfg-voice">Voz</label>
+    <select id="cfg-voice" class="panel-select">
+      <option value="">Padrão do sistema</option>
+    </select>
+  </div>
+
+  <div class="panel-section">
+    <div class="panel-row">
+      <label class="panel-label" for="cfg-rate">Velocidade de fala</label>
+      <span id="cfg-rate-display" class="panel-hint">1.0×</span>
+    </div>
+    <input id="cfg-rate" type="range" min="0.5" max="2" step="0.1" value="1" class="panel-range" />
+  </div>
+
+  <div class="panel-section">
+    <label class="panel-label" for="cfg-lang">Idioma do reconhecimento</label>
+    <select id="cfg-lang" class="panel-select">
+      <option value="pt-BR">Português (Brasil)</option>
+      <option value="pt-PT">Português (Portugal)</option>
+      <option value="en-US">English (US)</option>
+      <option value="es-ES">Español</option>
+    </select>
+  </div>
+
+  <div class="panel-section">
+    <div class="panel-row">
+      <div>
+        <div class="panel-label">Modo debug</div>
+        <div class="panel-hint" style="margin-top:2px">Mostra pontos e stamina</div>
+      </div>
+      <label class="toggle">
+        <input id="cfg-debug" type="checkbox" />
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+  </div>
+
+  <button class="btn-save" id="cfg-save">Salvar</button>
+  <div class="panel-info" id="cfg-info"></div>
+  <button class="btn-reset" id="cfg-reset">Resetar memória do Amic</button>
+</div>
+
+<div id="save-toast">Salvo!</div>
+
+<script type="module">
+  import { initFace, setExpression }                                         from '/js/face.js';
+  import { initRobot, handleUserMessage, getRobot, onRobotChange }           from '/js/robot.js';
+  import { listen }                                                           from '/js/voice.js';
+  import { loadMemory, saveMemory, resetMemory }                             from '/js/memory.js';
+  import { getEmotionState }                                                  from '/js/emotion.js';
+  import { getAvailableVoices }                                               from '/js/voice.js';
+  import { createSession, saveMessage, updateSession }                        from '/js/rails_api.js';
+
+  // ── face + robot ──
+  const svgEl        = document.getElementById('bip-face');
+  const micBtn       = document.getElementById('mic-btn');
+  const statusLabel  = document.getElementById('status-label');
+  const emotionLabel = document.getElementById('emotion-label');
+  const pointsLabel  = document.getElementById('points-label');
+  const transcriptEl = document.getElementById('transcript');
+  const responseEl   = document.getElementById('response');
+
+  function getVoiceOptions() {
+    const mem = loadMemory();
+    return { voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate) || 1, lang: mem.voiceLang || 'pt-BR' };
+  }
+
+  function updateUI(robot) {
+    const state = getEmotionState(robot.emotionPoints);
+    emotionLabel.textContent = state.name;
+    emotionLabel.className = `emotion-label emotion-${state.key.toLowerCase()}`;
+    const mem = loadMemory();
+    if (mem.showDebug) {
+      const lt = robot.memory?.long_term?.length ?? 0;
+      const mt = robot.memory?.medium_term?.length ?? 0;
+      const st = robot.memory?.short_term?.length ?? 0;
+      pointsLabel.textContent = `emoção: ${robot.emotionPoints} | stamina: ${robot.stamina ?? 100} | mem: ${lt}L ${mt}M ${st}S`;
+      pointsLabel.style.display = 'block';
+    } else {
+      pointsLabel.style.display = 'none';
+    }
+  }
+
+  // Defer so CSS layout is complete before reading offsetWidth/offsetHeight
+  requestAnimationFrame(() => initFace(svgEl));
+  initRobot(svgEl, updateUI);
+  updateUI(getRobot());
+  const robot = getRobot();
+  document.getElementById('robot-name').textContent = robot.name || 'Amic';
+  document.title = robot.name || 'Amic';
+
+  // ── start Rails session ──
+  let railsSessionId = sessionStorage.getItem('amic_session_id');
+  if (!railsSessionId) {
+    createSession(robot.name || 'Amic', robot.emotionPoints, robot.stamina ?? 100)
+      .then(id => { railsSessionId = id; sessionStorage.setItem('amic_session_id', id); })
+      .catch(() => {});
+  }
+
+  // close session on unload
+  window.addEventListener('beforeunload', () => {
+    if (!railsSessionId) return;
+    const r = getRobot();
+    updateSession(railsSessionId, r.emotionPoints, r.stamina ?? 100).catch(() => {});
+  });
+
+  // ── mic ──
+  let listening = false;
+  micBtn.addEventListener('click', async () => {
+    if (listening) return;
+    listening = true;
+    const stored = JSON.parse(localStorage.getItem('bip_data') || '{}');
+    if (!stored.apiKey) {
+      statusLabel.textContent = 'Configure a chave da API primeiro (⚙)';
+      setTimeout(() => (statusLabel.textContent = ''), 3000);
+      listening = false;
+      return;
+    }
+
+    micBtn.classList.add('listening');
+    statusLabel.textContent = 'Ouvindo...';
+    transcriptEl.textContent = '';
+    responseEl.textContent = '';
+
+    const mem = loadMemory();
+    let text;
+    try { text = await listen(mem.voiceLang || 'pt-BR'); }
+    catch {
+      statusLabel.textContent = 'Não consegui ouvir. Tente de novo.';
+      micBtn.classList.remove('listening');
+      setTimeout(() => (statusLabel.textContent = ''), 3000);
+      listening = false;
+      return;
+    }
+
+    micBtn.classList.remove('listening');
+    statusLabel.textContent = 'Pensando...';
+    transcriptEl.textContent = `Você: ${text}`;
+
+    // save user message to Rails
+    const r = getRobot();
+    if (railsSessionId) {
+      saveMessage(railsSessionId, 'user', text, r.emotionPoints, r.stamina ?? 100).catch(() => {});
+    }
+
+    const result = await handleUserMessage(text, getVoiceOptions());
+
+    if (result?.spokenText) {
+      responseEl.textContent = `Amic: ${result.spokenText}`;
+      // save assistant message to Rails
+      if (railsSessionId) {
+        const r2 = getRobot();
+        saveMessage(railsSessionId, 'assistant', result.spokenText, r2.emotionPoints, r2.stamina ?? 100).catch(() => {});
+      }
+    } else if (result?.error) {
+      responseEl.textContent = result.error;
+    }
+
+    statusLabel.textContent = '';
+    listening = false;
+  });
+
+  // ── settings panel ──
+  const settingsBtn = document.getElementById('settings-btn');
+  const panel       = document.getElementById('settings-panel');
+  const overlay     = document.getElementById('settings-overlay');
+  const closeBtn    = document.getElementById('panel-close');
+  const toast       = document.getElementById('save-toast');
+
+  function openPanel() {
+    populatePanel();
+    panel.classList.add('open');
+    overlay.classList.add('open');
+    settingsBtn.classList.add('open');
+  }
+  function closePanel() {
+    panel.classList.remove('open');
+    overlay.classList.remove('open');
+    settingsBtn.classList.remove('open');
+  }
+  settingsBtn.addEventListener('click', () => panel.classList.contains('open') ? closePanel() : openPanel());
+  closeBtn.addEventListener('click', closePanel);
+  overlay.addEventListener('click', closePanel);
+
+  function populatePanel() {
+    const mem = loadMemory();
+    document.getElementById('cfg-api-key').value = mem.apiKey || '';
+    document.getElementById('cfg-name').value    = mem.name || 'Amic';
+    document.getElementById('cfg-rate').value    = mem.voiceRate || 1;
+    document.getElementById('cfg-rate-display').textContent = parseFloat(mem.voiceRate || 1).toFixed(1) + '×';
+    document.getElementById('cfg-debug').checked = mem.showDebug || false;
+    document.getElementById('cfg-lang').value    = mem.voiceLang || 'pt-BR';
+
+    const lt = mem.memory?.long_term?.length ?? 0;
+    const mt = mem.memory?.medium_term?.length ?? 0;
+    const st = mem.memory?.short_term?.length ?? 0;
+    document.getElementById('cfg-info').innerHTML =
+      `Nascimento: ${new Date(mem.birthDate).toLocaleDateString('pt-BR')}<br>` +
+      `Memória: ${lt} permanentes · ${mt} consolidadas · ${st} recentes<br>` +
+      `Emoção: ${mem.emotionPoints ?? 50} pts · Stamina: ${mem.stamina ?? 100}/100`;
+
+    const voiceSelect = document.getElementById('cfg-voice');
+    voiceSelect.innerHTML = '<option value="">Padrão do sistema</option>';
+    getAvailableVoices().then(voices => {
+      voices.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = `${v.name} (${v.lang})`;
+        if (v.name === mem.voiceName) opt.selected = true;
+        voiceSelect.appendChild(opt);
+      });
+    });
+  }
+
+  document.getElementById('cfg-rate').addEventListener('input', e => {
+    document.getElementById('cfg-rate-display').textContent = parseFloat(e.target.value).toFixed(1) + '×';
+  });
+
+  document.getElementById('cfg-save').addEventListener('click', () => {
+    const mem = loadMemory();
+    mem.apiKey    = document.getElementById('cfg-api-key').value.trim();
+    mem.name      = document.getElementById('cfg-name').value.trim() || 'Amic';
+    mem.voiceName = document.getElementById('cfg-voice').value;
+    mem.voiceRate = parseFloat(document.getElementById('cfg-rate').value);
+    mem.voiceLang = document.getElementById('cfg-lang').value;
+    mem.showDebug = document.getElementById('cfg-debug').checked;
+    saveMemory(mem);
+    document.getElementById('robot-name').textContent = mem.name;
+    document.title = mem.name;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  });
+
+  document.getElementById('cfg-reset').addEventListener('click', () => {
+    if (confirm('Tem certeza? O Amic vai perder toda a memória e renascer do zero.')) {
+      resetMemory();
+      sessionStorage.removeItem('amic_session_id');
+      location.reload();
+    }
+  });
+</script>

@@ -1,0 +1,77 @@
+<% content_for :title, "Histórico — Amic" %>
+<% content_for :head do %>
+<style>
+  :root { --bg:#0d0d0f; --surface:#16161a; --surface2:#1e1e24; --accent:#7c6af5; --text:#ccccdd; --text-muted:#555566; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; min-height:100dvh; padding:32px 16px; }
+
+  .top-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:32px; max-width:680px; margin-left:auto; margin-right:auto; }
+  .top-left { display:flex; align-items:center; gap:16px; }
+  .back-link { color:var(--text-muted); text-decoration:none; font-size:0.8rem; transition:color 0.2s; }
+  .back-link:hover { color:var(--text); }
+  h1 { font-size:0.8rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--text-muted); }
+
+  .sessions { max-width:680px; margin:0 auto; display:flex; flex-direction:column; gap:12px; }
+
+  .empty { text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:80px; line-height:2; }
+
+  .session-card {
+    background:var(--surface); border-radius:12px; padding:18px 20px;
+    text-decoration:none; color:inherit; display:block;
+    border:1px solid #1e1e28; transition:border-color 0.2s, background 0.2s;
+  }
+  .session-card:hover { border-color:var(--accent); background:var(--surface2); }
+
+  .session-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .session-date { font-size:0.7rem; color:var(--text-muted); }
+  .session-emotion { font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; padding:3px 10px; border-radius:999px; background:var(--surface2); }
+
+  .emotion-eufórico   { color:#f5c842; border:1px solid #f5c84240; }
+  .emotion-feliz      { color:#7c6af5; border:1px solid #7c6af540; }
+  .emotion-neutro     { color:var(--text-muted); border:1px solid #55556640; }
+  .emotion-tristinho  { color:#5588bb; border:1px solid #5588bb40; }
+  .emotion-mal-humorado { color:#bb5555; border:1px solid #bb555540; }
+
+  .session-stats { display:flex; gap:20px; font-size:0.68rem; color:var(--text-muted); }
+  .session-stats span b { color:var(--text); }
+</style>
+<% end %>
+
+<div class="top-bar">
+  <div class="top-left">
+    <%= link_to '← voltar', '/', class: 'back-link' %>
+    <h1>Histórico de conversas</h1>
+  </div>
+  <%= link_to 'configurações', '/app_settings', class: 'back-link' %>
+</div>
+
+<div class="sessions">
+  <% if @sessions.empty? %>
+    <div class="empty">
+      Nenhuma conversa registrada ainda.<br>
+      Fale com o Amic para começar.
+    </div>
+  <% else %>
+    <% @sessions.each do |session| %>
+      <% emotion = session.emotion_label(session.emotion_end || session.emotion_start || 50) %>
+      <%= link_to "/history/#{session.id}", class: 'session-card' do %>
+        <div class="session-header">
+          <div class="session-date"><%= session.created_at.strftime('%d/%m/%Y às %H:%M') %></div>
+          <span class="session-emotion emotion-<%= emotion %>"><%= emotion %></span>
+        </div>
+        <div class="session-stats">
+          <span><b><%= session.messages.size %></b> mensagens</span>
+          <% if session.duration_minutes %>
+            <span><b><%= session.duration_minutes %></b> min</span>
+          <% end %>
+          <% if session.emotion_start && session.emotion_end %>
+            <span>emoção <b><%= session.emotion_start %></b> → <b><%= session.emotion_end %></b></span>
+          <% end %>
+          <% if session.stamina_end %>
+            <span>stamina final <b><%= session.stamina_end %></b></span>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>
