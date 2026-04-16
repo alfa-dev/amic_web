@@ -45,13 +45,35 @@
 
 
   .emotion-label { font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; margin-top: 10px; transition: color 0.5s; }
-  .emotion-euphoric { color: #f5c842; }
-  .emotion-happy    { color: #7c6af5; }
-  .emotion-neutral  { color: var(--text-muted); }
-  .emotion-sad      { color: #5588bb; }
-  .emotion-grumpy   { color: #bb5555; }
+  .emotion-euphoric  { color: #f5c842; }
+  .emotion-happy     { color: #7c6af5; }
+  .emotion-neutral   { color: var(--text-muted); }
+  .emotion-sad       { color: #5588bb; }
+  .emotion-grumpy    { color: #bb5555; }
+  .emotion-tired     { color: #889988; }
+  .emotion-exhausted { color: #667766; }
 
   #points-label { display: none; font-size: 0.6rem; color: var(--text-muted); margin-top: 4px; }
+
+  #mood-hud  { display: flex; gap: 10px; margin-top: 6px; align-items: flex-end; }
+  .hud-col   { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .hud-bar   { width: 60px; height: 4px; background: #1e1e24; border-radius: 2px; overflow: hidden; }
+  .hud-fill  { height: 100%; width: 0%; transition: width 0.5s, background 0.5s; border-radius: 2px; }
+  .hud-lbl   { font-size: 0.42rem; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; }
+  #hud-charging { font-size: 0.65rem; color: #44aa66; display: none; margin-bottom: 1px;
+                  animation: blink-charge 1.2s infinite; align-self: flex-end; }
+  @keyframes blink-charge { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .stat-pop { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%);
+    font-size: 0.75rem; font-family: 'Courier New', monospace; pointer-events: none;
+    animation: float-up 1.4s ease-out forwards; }
+  .stat-pop.pos   { color: #44aa66; }
+  .stat-pop.neg   { color: #aa4444; }
+  .stat-pop.learn { color: #7c6af5; }
+  @keyframes float-up {
+    0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-44px); }
+  }
 
   #status-label { font-size: 0.7rem; color: var(--text-muted); min-height: 1.2em; margin-top: 18px; letter-spacing: 0.1em; }
 
@@ -155,6 +177,77 @@
   #settings-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99; }
   #settings-overlay.open { display: block; }
 
+  /* Debug panel */
+  #debug-panel {
+    position: fixed; top: 0; left: 0;
+    height: 100dvh; width: min(380px, 95vw);
+    background: var(--surface);
+    border-right: 1px solid #222230;
+    display: flex; flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    z-index: 100; overflow-y: auto;
+    font-size: 0.72rem;
+  }
+  #debug-panel.open { transform: translateX(0); }
+
+  #debug-btn.open { opacity: 1; }
+
+  .acc-section { border-bottom: 1px solid #1a1a22; }
+  .acc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; cursor: pointer; user-select: none;
+    font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--text-muted); transition: color 0.2s;
+  }
+  .acc-header:hover { color: var(--text); }
+  .acc-header .acc-arrow { transition: transform 0.2s; font-size: 0.5rem; }
+  .acc-section.open .acc-header .acc-arrow { transform: rotate(90deg); }
+  .acc-body { display: none; padding: 6px 16px 12px; }
+  .acc-section.open .acc-body { display: block; }
+
+  .dbg-row { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 3px 0; border-bottom: 1px solid #16161a; }
+  .dbg-row:last-child { border-bottom: none; }
+  .dbg-key { color: var(--text-muted); font-size: 0.62rem; }
+  .dbg-val { color: var(--text); font-size: 0.68rem; text-align: right; max-width: 55%; word-break: break-all; }
+
+  .dbg-fact { padding: 4px 0; border-bottom: 1px solid #16161a; color: var(--text); font-size: 0.65rem; line-height: 1.4; }
+  .dbg-fact:last-child { border-bottom: none; }
+  .dbg-tier { font-size: 0.5rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--accent); opacity: 0.6; display: block; margin-bottom: 4px; margin-top: 8px; }
+
+  .dbg-code-item { margin-bottom: 10px; }
+  .dbg-code-name { font-size: 0.6rem; color: var(--accent); letter-spacing: 0.15em; margin-bottom: 4px; cursor: pointer; }
+  .dbg-code-name:hover { opacity: 0.7; }
+  .dbg-code-detail { display: none; background: #0d0d0f; border-radius: 4px;
+    padding: 6px 8px; font-size: 0.58rem; color: var(--text-muted); white-space: pre-wrap; line-height: 1.5; }
+  .dbg-code-item.expanded .dbg-code-detail { display: block; }
+
+  .dbg-msg { padding: 4px 0; border-bottom: 1px solid #16161a; font-size: 0.65rem; line-height: 1.4; }
+  .dbg-msg:last-child { border-bottom: none; }
+  .dbg-msg .dbg-role { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); opacity: 0.7; }
+  .dbg-msg .dbg-msg-text { color: var(--text); margin-top: 2px; }
+
+  .dbg-empty { color: var(--text-muted); font-size: 0.62rem; font-style: italic; }
+
+  /* Editable stat inputs inside debug panel */
+  .dbg-edit-wrap { display: flex; align-items: center; gap: 5px; }
+  .dbg-edit-input {
+    width: 48px; background: var(--surface2);
+    border: 1px solid #2a2a35; border-radius: 4px;
+    color: var(--text); padding: 2px 5px;
+    font-family: 'Courier New', monospace; font-size: 0.65rem;
+    text-align: right;
+  }
+  .dbg-edit-input:focus { border-color: var(--accent); outline: none; }
+  .dbg-edit-btn {
+    background: transparent; border: 1px solid #2a2a35; border-radius: 4px;
+    color: var(--accent); cursor: pointer; font-size: 0.6rem;
+    padding: 2px 5px; transition: background 0.15s;
+  }
+  .dbg-edit-btn:hover { background: rgba(124,106,245,0.15); }
+
   #save-toast {
     position: fixed; bottom: 32px; left: 50%;
     transform: translateX(-50%) translateY(20px);
@@ -164,6 +257,50 @@
     pointer-events: none; z-index: 200;
   }
   #save-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Sleep effects container */
+  #sleep-fx {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 10;
+  }
+
+  /* Individual ZZZ particles */
+  .zzz-particle {
+    position: absolute;
+    font-family: 'Courier New', monospace;
+    color: var(--accent);
+    pointer-events: none;
+    opacity: 0;
+    animation: zzz-rise var(--dur, 2.8s) ease-out forwards;
+  }
+  @keyframes zzz-rise {
+    0%   { opacity: 0;    transform: translateY(0px)   scale(0.6); }
+    18%  { opacity: 0.9;  transform: translateY(-12px) scale(1.0); }
+    75%  { opacity: 0.7; }
+    100% { opacity: 0;    transform: translateY(-70px) scale(1.1); }
+  }
+
+  /* Dream emoji bubbles */
+  .dream-bubble {
+    position: absolute;
+    background: rgba(22, 22, 26, 0.92);
+    border: 1px solid rgba(124, 106, 245, 0.35);
+    border-radius: 50%;
+    width: 46px; height: 46px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    pointer-events: none;
+    opacity: 0;
+    animation: bubble-float var(--dur, 4.5s) ease-out forwards;
+    box-shadow: 0 0 12px rgba(124, 106, 245, 0.15);
+  }
+  @keyframes bubble-float {
+    0%   { opacity: 0; transform: translateY(0)    scale(0.4); }
+    20%  { opacity: 1; transform: translateY(-22px) scale(1.0); }
+    75%  { opacity: 0.85; }
+    100% { opacity: 0; transform: translateY(-95px) scale(0.75); }
+  }
 </style>
 <% end %>
 
@@ -175,7 +312,24 @@
 
 <div id="emotion-label" class="emotion-label emotion-neutral">neutro</div>
 <div id="points-label"></div>
+<div id="mood-hud">
+  <div class="hud-col">
+    <div class="hud-bar"><div class="hud-fill" id="hud-emotion-fill"></div></div>
+    <span class="hud-lbl">humor</span>
+  </div>
+  <div class="hud-col">
+    <div class="hud-bar"><div class="hud-fill" id="hud-stamina-fill"></div></div>
+    <span class="hud-lbl">energia</span>
+  </div>
+  <div class="hud-col">
+    <div class="hud-bar"><div class="hud-fill" id="hud-battery-fill"></div></div>
+    <span class="hud-lbl">bateria</span>
+  </div>
+  <span id="hud-charging" title="Carregando">⚡</span>
+</div>
 <div id="status-label"></div>
+
+<div id="sleep-fx"></div>
 
 <button id="mic-btn" aria-label="Falar com Amic">
   <svg viewBox="0 0 24 24">
@@ -196,12 +350,55 @@
   <a href="/history" class="nav-btn" title="Histórico">
     <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
   </a>
+  <button id="debug-btn" class="nav-btn" title="Debug">
+    <svg viewBox="0 0 24 24">
+      <path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v1h-2v-1a1 1 0 0 0-1-1h-1v1a4 4 0 0 1-8 0V9H7a1 1 0 0 0-1 1v1H4v-1a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/>
+      <path d="M8 14H4m16 0h-4M8 18H5m14 0h-3"/>
+      <circle cx="12" cy="12" r="2"/>
+    </svg>
+  </button>
   <button id="settings-btn" class="nav-btn" title="Configurações">
     <svg viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="3"/>
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
     </svg>
   </button>
+</div>
+
+<!-- Debug panel -->
+<div id="debug-panel" role="dialog" aria-label="Debug">
+  <div class="panel-header">
+    <h2>Debug — Estado do Amic</h2>
+    <button id="debug-close">✕</button>
+  </div>
+
+  <div class="acc-section open" id="acc-status">
+    <div class="acc-header" data-acc="acc-status">
+      <span>Status</span><span class="acc-arrow">▶</span>
+    </div>
+    <div class="acc-body" id="dbg-status"></div>
+  </div>
+
+  <div class="acc-section" id="acc-memory">
+    <div class="acc-header" data-acc="acc-memory">
+      <span>Memórias</span><span class="acc-arrow">▶</span>
+    </div>
+    <div class="acc-body" id="dbg-memory"></div>
+  </div>
+
+  <div class="acc-section" id="acc-code">
+    <div class="acc-header" data-acc="acc-code">
+      <span>Código Aprendido</span><span class="acc-arrow">▶</span>
+    </div>
+    <div class="acc-body" id="dbg-code"></div>
+  </div>
+
+  <div class="acc-section" id="acc-conv">
+    <div class="acc-header" data-acc="acc-conv">
+      <span>Conversa Recente</span><span class="acc-arrow">▶</span>
+    </div>
+    <div class="acc-body" id="dbg-conv"></div>
+  </div>
 </div>
 
 <!-- Settings overlay -->
@@ -271,9 +468,9 @@
 <div id="save-toast">Salvo!</div>
 
 <script type="module">
-  import { initFace, setExpression }                                         from '/js/face.js';
-  import { initRobot, handleUserMessage, getRobot, onRobotChange }           from '/js/robot.js';
-  import { listen }                                                           from '/js/voice.js';
+  import { initFace, setExpression, setActivity }                            from '/js/face.js';
+  import { initRobot, handleUserMessage, getRobot, setRobot, getCodeLibrary, resetCodeLibrary, isSleeping, wakeUp } from '/js/robot.js';
+  import { listen, listenPTT, speak }                                        from '/js/voice.js';
   import { loadMemory, saveMemory, resetMemory }                             from '/js/memory.js';
   import { getEmotionState }                                                  from '/js/emotion.js';
   import { getAvailableVoices }                                               from '/js/voice.js';
@@ -287,16 +484,33 @@
   const pointsLabel  = document.getElementById('points-label');
   const transcriptEl = document.getElementById('transcript');
   const responseEl   = document.getElementById('response');
+  const debugBtn     = document.getElementById('debug-btn');
+  const debugPanel   = document.getElementById('debug-panel');
+  const debugClose   = document.getElementById('debug-close');
 
   function getVoiceOptions() {
     const mem = loadMemory();
     return { voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate) || 1, lang: mem.voiceLang || 'pt-BR' };
   }
 
+  const emotionColors = {
+    EUPHORIC: '#f5c842', HAPPY: '#7c6af5', NEUTRAL: '#555566',
+    SAD: '#5588bb', GRUMPY: '#bb5555', TIRED: '#889988', EXHAUSTED: '#667766'
+  };
+
   function updateUI(robot) {
-    const state = getEmotionState(robot.emotionPoints);
+    const state = getEmotionState(robot.emotionPoints, robot.stamina ?? 100);
     emotionLabel.textContent = state.name;
     emotionLabel.className = `emotion-label emotion-${state.key.toLowerCase()}`;
+
+    const ef = document.getElementById('hud-emotion-fill');
+    const sf = document.getElementById('hud-stamina-fill');
+    ef.style.width = (robot.emotionPoints ?? 50) + '%';
+    ef.style.background = emotionColors[state.key] || '#555566';
+    const s = robot.stamina ?? 100;
+    sf.style.width = s + '%';
+    sf.style.background = s > 60 ? '#44aa66' : s > 30 ? '#aaaa44' : '#aa4444';
+
     const mem = loadMemory();
     if (mem.showDebug) {
       const lt = robot.memory?.long_term?.length ?? 0;
@@ -307,6 +521,9 @@
     } else {
       pointsLabel.style.display = 'none';
     }
+
+    // Keep debug panel in sync whenever robot state changes
+    updateDebugPanel();
   }
 
   // Defer so CSS layout is complete before reading offsetWidth/offsetHeight
@@ -335,6 +552,8 @@
   // ── mic ──
   let listening = false;
   micBtn.addEventListener('click', async () => {
+    // Wake up if sleeping
+    if (isSleeping()) { wakeUp(); return; }
     if (listening) return;
     listening = true;
     const stored = JSON.parse(localStorage.getItem('bip_data') || '{}');
@@ -349,6 +568,7 @@
     statusLabel.textContent = 'Ouvindo...';
     transcriptEl.textContent = '';
     responseEl.textContent = '';
+    setActivity('listen');
 
     const mem = loadMemory();
     let text;
@@ -356,6 +576,7 @@
     catch {
       statusLabel.textContent = 'Não consegui ouvir. Tente de novo.';
       micBtn.classList.remove('listening');
+      setActivity('idle');
       setTimeout(() => (statusLabel.textContent = ''), 3000);
       listening = false;
       return;
@@ -364,6 +585,7 @@
     micBtn.classList.remove('listening');
     statusLabel.textContent = 'Pensando...';
     transcriptEl.textContent = `Você: ${text}`;
+    setActivity('think');
 
     // save user message to Rails
     const r = getRobot();
@@ -371,7 +593,11 @@
       saveMessage(railsSessionId, 'user', text, r.emotionPoints, r.stamina ?? 100).catch(() => {});
     }
 
-    const result = await handleUserMessage(text, getVoiceOptions());
+    const result = await handleUserMessage(text, {
+      ...getVoiceOptions(),
+      onChunk: (partial) => { responseEl.textContent = `Amic: ${partial}`; setActivity('speak'); },
+      onEnd: () => setActivity('idle'),
+    });
 
     if (result?.spokenText) {
       responseEl.textContent = `Amic: ${result.spokenText}`;
@@ -382,6 +608,243 @@
       }
     } else if (result?.error) {
       responseEl.textContent = result.error;
+      setActivity('idle');
+    }
+
+    statusLabel.textContent = '';
+    listening = false;
+  });
+
+  const sleepFx = document.getElementById('sleep-fx');
+  let _sleepFxTimer = null;
+  let _audioCtx = null;
+
+  const SLEEP_EMOJIS = ['💤', '⭐', '🌙', '💭', '✨', '🌟', '☁️', '🌠'];
+
+  function _getAudioCtx() {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return _audioCtx;
+  }
+
+  function _playRobotBleep() {
+    try {
+      const ctx = _getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 180 + Math.random() * 120;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.035, ctx.currentTime + 0.08);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.45);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch {}
+  }
+
+  function _spawnZzzParticle() {
+    const rect = svgEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height * 0.28;
+    const el = document.createElement('div');
+    el.className = 'zzz-particle';
+    const letters = ['Z', 'z', 'Z', 'zz', 'Zzz'];
+    el.textContent = letters[Math.floor(Math.random() * letters.length)];
+    const size = 0.65 + Math.random() * 0.75;
+    el.style.fontSize = `${size}rem`;
+    el.style.left = `${cx + (Math.random() - 0.5) * 64}px`;
+    el.style.top  = `${cy + (Math.random() - 0.5) * 28}px`;
+    el.style.setProperty('--dur', `${2.2 + Math.random() * 1.6}s`);
+    sleepFx.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  function _spawnDreamBubble(emoji) {
+    const rect = svgEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height * 0.22;
+    const el = document.createElement('div');
+    el.className = 'dream-bubble';
+    el.textContent = emoji;
+    el.style.left = `${cx + (Math.random() - 0.5) * 110 - 23}px`;
+    el.style.top  = `${cy + (Math.random() - 0.5) * 44}px`;
+    el.style.setProperty('--dur', `${3.8 + Math.random() * 2}s`);
+    sleepFx.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  function startSleepEffects() {
+    let nextZ = 0, nextBleep = 0, nextEmoji = 0;
+    _sleepFxTimer = setInterval(() => {
+      const now = Date.now();
+      if (now > nextZ) {
+        _spawnZzzParticle();
+        nextZ = now + 1100 + Math.random() * 1200;
+      }
+      if (now > nextEmoji) {
+        const emoji = SLEEP_EMOJIS[Math.floor(Math.random() * SLEEP_EMOJIS.length)];
+        _spawnDreamBubble(emoji);
+        nextEmoji = now + 3500 + Math.random() * 3000;
+      }
+      if (now > nextBleep) {
+        _playRobotBleep();
+        nextBleep = now + 3200 + Math.random() * 4500;
+      }
+    }, 250);
+  }
+
+  function stopSleepEffects() {
+    if (_sleepFxTimer) { clearInterval(_sleepFxTimer); _sleepFxTimer = null; }
+    sleepFx.innerHTML = '';
+  }
+
+  // ── sleep events ──
+  document.addEventListener('amic:sleep', ({ detail }) => {
+    if (detail.sleeping) {
+      startSleepEffects();
+      statusLabel.textContent = 'ZZZzzz...';
+      transcriptEl.textContent = '';
+      responseEl.textContent = '';
+    } else {
+      stopSleepEffects();
+      statusLabel.textContent = '';
+    }
+  });
+
+  // ── spontaneous speech ──
+  document.addEventListener('amic:spontaneous', async ({ detail }) => {
+    if (!detail.text || listening) return;
+    transcriptEl.textContent = '';
+    responseEl.textContent = `Amic: ${detail.text}`;
+    setActivity('speak');
+    const mem = loadMemory();
+    await speak(detail.text, {
+      voiceName: mem.voiceName || '',
+      rate: parseFloat(mem.voiceRate) || 1,
+      lang: mem.voiceLang || 'pt-BR',
+      onEnd: () => { setActivity('idle'); responseEl.textContent = ''; },
+    });
+  });
+
+  // ── dream wake-up ──
+  document.addEventListener('amic:dream', async ({ detail }) => {
+    if (!detail.text || listening) return;
+    // Show dream-specific emojis first
+    const emojis = detail.dreamEmojis || [];
+    if (emojis.length) {
+      emojis.forEach((emoji, i) => setTimeout(() => _spawnDreamBubble(emoji), i * 380));
+      await new Promise(r => setTimeout(r, 1400));
+    }
+    transcriptEl.textContent = '';
+    responseEl.textContent = `Amic: ${detail.text}`;
+    setActivity('speak');
+    const mem = loadMemory();
+    await speak(detail.text, {
+      voiceName: mem.voiceName || '',
+      rate: parseFloat(mem.voiceRate) || 1,
+      lang: mem.voiceLang || 'pt-BR',
+      onEnd: () => { setActivity('idle'); responseEl.textContent = ''; },
+    });
+  });
+
+  // ── battery HUD ──
+  const chargingEl   = document.getElementById('hud-charging');
+  const batteryFill  = document.getElementById('hud-battery-fill');
+  document.addEventListener('amic:battery-change', ({ detail }) => {
+    const { level, charging } = detail;
+    batteryFill.style.width      = level + '%';
+    batteryFill.style.background = level > 50 ? '#44aa66' : level > 20 ? '#aaaa44' : '#aa4444';
+    chargingEl.style.display     = charging ? 'inline' : 'none';
+  });
+
+  // ── stat pops ──
+  function spawnPop(delta, type) {
+    const el = document.createElement('div');
+    el.className = `stat-pop ${delta > 0 ? 'pos' : 'neg'}`;
+    el.textContent = (delta > 0 ? '+' : '') + Math.round(delta);
+    el.style.left = type === 'stamina' ? 'calc(50% + 30px)' : 'calc(50% - 30px)';
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+  document.addEventListener('amic:stat-change', ({ detail }) => {
+    if (detail.dEmotion) spawnPop(detail.dEmotion, 'emotion');
+    if (detail.dStamina) spawnPop(detail.dStamina, 'stamina');
+  });
+
+  function spawnLearnPop(count) {
+    const el = document.createElement('div');
+    el.className = 'stat-pop learn';
+    el.textContent = `+${count} fato${count > 1 ? 's' : ''}`;
+    el.style.left = 'calc(50% + 60px)';
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+  document.addEventListener('amic:learned', ({ detail }) => {
+    spawnLearnPop(detail.count);
+  });
+
+  document.addEventListener('amic:learning', ({ detail }) => {
+    statusLabel.textContent = `aprendendo sobre "${detail.topic}"...`;
+    setActivity('think');
+  });
+
+  // ── PTT (hold Space) ──
+  let pttSession = null;
+  document.addEventListener('keydown', async (e) => {
+    if (e.code !== 'Space' || e.repeat || listening) return;
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+    e.preventDefault();
+    // Wake up if sleeping
+    if (isSleeping()) { wakeUp(); return; }
+    const stored = JSON.parse(localStorage.getItem('bip_data') || '{}');
+    if (!stored.apiKey) {
+      statusLabel.textContent = 'Configure a chave da API primeiro (⚙)';
+      setTimeout(() => (statusLabel.textContent = ''), 3000);
+      return;
+    }
+    const mem = loadMemory();
+    pttSession = listenPTT(mem.voiceLang || 'pt-BR');
+    if (!pttSession) return;
+    listening = true;
+    pttSession.start();
+    micBtn.classList.add('listening');
+    statusLabel.textContent = 'Segure espaço para falar...';
+    transcriptEl.textContent = '';
+    responseEl.textContent = '';
+    setActivity('listen');
+  });
+  document.addEventListener('keyup', async (e) => {
+    if (e.code !== 'Space' || !pttSession) return;
+    e.preventDefault();
+    const text = await pttSession.stop();
+    pttSession = null;
+    micBtn.classList.remove('listening');
+    if (!text?.trim()) { listening = false; statusLabel.textContent = ''; setActivity('idle'); return; }
+    statusLabel.textContent = 'Pensando...';
+    transcriptEl.textContent = `Você: ${text}`;
+    setActivity('think');
+
+    const r = getRobot();
+    if (railsSessionId) {
+      saveMessage(railsSessionId, 'user', text, r.emotionPoints, r.stamina ?? 100).catch(() => {});
+    }
+
+    const result = await handleUserMessage(text, {
+      ...getVoiceOptions(),
+      onChunk: (partial) => { responseEl.textContent = `Amic: ${partial}`; setActivity('speak'); },
+      onEnd: () => setActivity('idle'),
+    });
+
+    if (result?.spokenText) {
+      responseEl.textContent = `Amic: ${result.spokenText}`;
+      if (railsSessionId) {
+        const r2 = getRobot();
+        saveMessage(railsSessionId, 'assistant', result.spokenText, r2.emotionPoints, r2.stamina ?? 100).catch(() => {});
+      }
+    } else if (result?.error) {
+      responseEl.textContent = result.error;
+      setActivity('idle');
     }
 
     statusLabel.textContent = '';
@@ -462,8 +925,171 @@
   document.getElementById('cfg-reset').addEventListener('click', () => {
     if (confirm('Tem certeza? O Amic vai perder toda a memória e renascer do zero.')) {
       resetMemory();
+      resetCodeLibrary();
       sessionStorage.removeItem('amic_session_id');
       location.reload();
     }
+  });
+
+  // ── Debug panel ──
+  function openDebug() {
+    debugPanel.classList.add('open');
+    debugBtn.classList.add('open');
+    updateDebugPanel();
+  }
+  function closeDebug() {
+    debugPanel.classList.remove('open');
+    debugBtn.classList.remove('open');
+  }
+  debugBtn.addEventListener('click', () => debugPanel.classList.contains('open') ? closeDebug() : openDebug());
+  debugClose.addEventListener('click', closeDebug);
+
+  // Accordion toggle
+  document.querySelectorAll('.acc-header').forEach(hdr => {
+    hdr.addEventListener('click', () => {
+      hdr.closest('.acc-section').classList.toggle('open');
+    });
+  });
+
+  function row(key, val) {
+    return `<div class="dbg-row"><span class="dbg-key">${key}</span><span class="dbg-val">${val}</span></div>`;
+  }
+
+  function editRow(key, val, id, min, max) {
+    return `<div class="dbg-row">
+      <span class="dbg-key">${key}</span>
+      <span class="dbg-val">
+        <span class="dbg-edit-wrap">
+          <input class="dbg-edit-input" id="${id}" type="number" min="${min}" max="${max}" value="${val}">
+          <button class="dbg-edit-btn" data-edit-target="${id}">✓</button>
+        </span>
+      </span>
+    </div>`;
+  }
+
+  function updateDebugPanel() {
+    if(debugPanel === null) return;
+    if (!debugPanel || !debugPanel.classList.contains('open')) return;
+    const robot = getRobot();
+    const lib   = getCodeLibrary();
+    const state = getEmotionState(robot.emotionPoints, robot.stamina ?? 100);
+
+    // — Status —
+    const skills = robot.skills || {};
+    const weak   = robot.weaknesses || {};
+    document.getElementById('dbg-status').innerHTML = [
+      row('Nome', robot.name || 'Amic'),
+      row('Nascimento', new Date(robot.birthDate).toLocaleDateString('pt-BR')),
+      row('Estado emocional', `${state.name} (${state.key})`),
+      editRow('Emoção', robot.emotionPoints ?? 50, 'dbg-edit-emotion', 0, 100),
+      editRow('Stamina', robot.stamina ?? 100, 'dbg-edit-stamina', 0, 100),
+      row('Minutos falados', robot.totalTalkMinutes ?? 0),
+      '<div class="dbg-tier">Habilidades</div>',
+      ...Object.entries(skills).map(([k, v]) => row(k, v)),
+      '<div class="dbg-tier">Fraquezas</div>',
+      ...Object.entries(weak).map(([k, v]) => row(k, v)),
+    ].join('');
+
+    // — Memórias —
+    const mem = robot.memory || {};
+    const lt = mem.long_term || [];
+    const mt = mem.medium_term || [];
+    const st = mem.short_term || [];
+    let memHtml = '';
+    if (lt.length) {
+      memHtml += `<span class="dbg-tier">Permanentes (${lt.length})</span>`;
+      memHtml += lt.map(f => `<div class="dbg-fact">${escHtml(typeof f === 'object' ? (f.content || f.text || JSON.stringify(f)) : f)}</div>`).join('');
+    }
+    if (mt.length) {
+      memHtml += `<span class="dbg-tier">Consolidadas (${mt.length})</span>`;
+      memHtml += mt.map(f => `<div class="dbg-fact">${escHtml(typeof f === 'object' ? (f.content || f.text || JSON.stringify(f)) : f)}</div>`).join('');
+    }
+    if (st.length) {
+      memHtml += `<span class="dbg-tier">Recentes (${st.length})</span>`;
+      memHtml += st.map(f => `<div class="dbg-fact">${escHtml(typeof f === 'object' ? (f.content || f.text || JSON.stringify(f)) : f)}</div>`).join('');
+    }
+    if (!memHtml) memHtml = '<span class="dbg-empty">Nenhuma memória ainda.</span>';
+    document.getElementById('dbg-memory').innerHTML = memHtml;
+
+    // — Código Aprendido —
+    const exprs   = lib.expressions || {};
+    const actions = lib.actions     || {};
+    let codeHtml = '';
+
+    const actionEntries = Object.entries(actions);
+    if (actionEntries.length) {
+      codeHtml += `<span class="dbg-tier">Ações nomeadas (${actionEntries.length})</span>`;
+      codeHtml += actionEntries.map(([name, { description, code, ts }]) => `
+        <div class="dbg-code-item">
+          <div class="dbg-code-name" onclick="this.closest('.dbg-code-item').classList.toggle('expanded')">
+            ▶ ${escHtml(name)}
+            <span style="opacity:0.55;font-size:0.58rem;font-weight:normal;letter-spacing:0"> — ${escHtml(description || '')}</span>
+            <span style="opacity:0.3;font-size:0.5rem"> ${ts ? new Date(ts).toLocaleTimeString('pt-BR') : ''}</span>
+          </div>
+          <pre class="dbg-code-detail">${escHtml(code)}</pre>
+        </div>`).join('');
+    }
+
+    const exprEntries = Object.entries(exprs);
+    if (exprEntries.length) {
+      codeHtml += `<span class="dbg-tier">Expressões permanentes (${exprEntries.length})</span>`;
+      codeHtml += exprEntries.map(([name, { params, ts }]) => `
+        <div class="dbg-code-item">
+          <div class="dbg-code-name" onclick="this.closest('.dbg-code-item').classList.toggle('expanded')">
+            ▶ ${escHtml(name)} <span style="opacity:0.3;font-size:0.5rem">${ts ? new Date(ts).toLocaleTimeString('pt-BR') : ''}</span>
+          </div>
+          <pre class="dbg-code-detail">${escHtml(JSON.stringify(params, null, 2))}</pre>
+        </div>`).join('');
+    }
+
+    if (!codeHtml) codeHtml = '<span class="dbg-empty">Nenhum código aprendido ainda.</span>';
+    document.getElementById('dbg-code').innerHTML = codeHtml;
+
+    // — Conversa Recente —
+    const history = (robot.conversationHistory || []).slice(-10);
+    if (history.length) {
+      document.getElementById('dbg-conv').innerHTML = history.map(m => `
+        <div class="dbg-msg">
+          <span class="dbg-role">${m.role === 'user' ? 'Você' : 'Amic'}</span>
+          <div class="dbg-msg-text">${escHtml(m.content)}</div>
+        </div>`).join('');
+    } else {
+      document.getElementById('dbg-conv').innerHTML = '<span class="dbg-empty">Nenhuma conversa ainda.</span>';
+    }
+  }
+
+  // Editable stat fields — event delegation on the debug panel
+  document.getElementById('dbg-status').addEventListener('click', (e) => {
+    const btn = e.target.closest('.dbg-edit-btn');
+    if (!btn) return;
+    const targetId = btn.dataset.editTarget;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    const val = Math.max(parseInt(input.min), Math.min(parseInt(input.max), parseInt(input.value) || 0));
+    const r = getRobot();
+    if (targetId === 'dbg-edit-emotion') r.emotionPoints = val;
+    if (targetId === 'dbg-edit-stamina') r.stamina = val;
+    setRobot(r);
+    updateUI(r);
+    updateDebugPanel();
+  });
+
+  // Also apply on Enter key in the input
+  document.getElementById('dbg-status').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const input = e.target.closest('.dbg-edit-input');
+    if (!input) return;
+    input.closest('.dbg-edit-wrap')?.querySelector('.dbg-edit-btn')?.click();
+  });
+
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Brief code-activity flash when robot executes new code
+  document.addEventListener('amic:code-executed', () => {
+    setActivity('code');
+    setTimeout(() => setActivity('idle'), 1800);
+    updateDebugPanel();
   });
 </script>

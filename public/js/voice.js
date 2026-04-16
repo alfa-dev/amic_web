@@ -49,6 +49,30 @@ export function stopListening() {
   }
 }
 
+export function listenPTT(lang = 'pt-BR') {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+  const rec = new SpeechRecognition();
+  rec.lang = lang;
+  rec.continuous = true;
+  rec.interimResults = true;
+  let finalTranscript = '';
+  let resolveStop;
+
+  rec.onresult = (e) => {
+    finalTranscript = '';
+    for (const result of e.results) {
+      finalTranscript += result[0].transcript;
+    }
+  };
+  rec.onend = () => resolveStop?.(finalTranscript);
+
+  return {
+    start() { finalTranscript = ''; rec.start(); },
+    stop()  { return new Promise(r => { resolveStop = r; rec.stop(); }); },
+  };
+}
+
 export function speak(text, { voiceName = '', rate = 1, lang = 'pt-BR', onStart, onEnd } = {}) {
   return new Promise((resolve) => {
     if (currentUtterance) {
