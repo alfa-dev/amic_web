@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Downloads face-api.js + model weights for local vision.
+# Run once from the project root: bin/download_models
+set -e
+
+JS_DEST="public/js"
+MODEL_DEST="public/models"
+JSDELIVR_JS="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"
+# Models from the GitHub CDN (jsDelivr mirrors GitHub releases)
+JSDELIVR_GH="https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights"
+
+mkdir -p "$JS_DEST" "$MODEL_DEST"
+
+echo "→ Baixando face-api.min.js..."
+curl -fsSL -o "$JS_DEST/face-api.min.js" "$JSDELIVR_JS"
+
+MODEL_FILES=(
+  "tiny_face_detector_model-weights_manifest.json"
+  "tiny_face_detector_model-shard1"
+  "face_landmark_68_tiny_model-weights_manifest.json"
+  "face_landmark_68_tiny_model-shard1"
+  "face_recognition_model-weights_manifest.json"
+  "face_recognition_model-shard1"
+  "face_recognition_model-shard2"
+  "age_gender_model-weights_manifest.json"
+  "age_gender_model-shard1"
+)
+
+for f in "${MODEL_FILES[@]}"; do
+  echo "→ $f"
+  curl -fsSL -o "$MODEL_DEST/$f" "$JSDELIVR_GH/$f"
+done
+
+echo ""
+echo "✓ Concluído! face-api.js e modelos salvos localmente."
+echo "  Biblioteca : $JS_DEST/face-api.min.js"
+echo "  Modelos    : $MODEL_DEST/"

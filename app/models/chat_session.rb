@@ -1,4 +1,5 @@
 class ChatSession < ApplicationRecord
+  belongs_to :user, optional: true
   has_many :messages, dependent: :destroy
 
   scope :recent, -> { order(created_at: :desc) }

@@ -4,6 +4,7 @@ module Api
 
     def create
       @session = ChatSession.create!(
+        user:          current_user,
         robot_name:    params.dig(:session, :robot_name) || 'Amic',
         emotion_start: params.dig(:session, :emotion_start) || 50,
         stamina_start: params.dig(:session, :stamina_start) || 100

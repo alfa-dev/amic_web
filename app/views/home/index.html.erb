@@ -17,34 +17,74 @@
     background: var(--bg);
     color: var(--text);
     font-family: 'Courier New', monospace;
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    height: 100dvh;
     overflow: hidden;
   }
 
+  /* Full-screen canvas */
+  #face-wrap {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100dvh;
+    z-index: 0;
+  }
+  #bip-face {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+
+  /* Top bar */
+  #user-chip {
+    position: fixed;
+    top: 14px; left: 14px;
+    font-size: 0.58rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    z-index: 10;
+    pointer-events: none;
+  }
   #robot-name {
-    font-size: 0.75rem;
+    position: fixed;
+    top: 14px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.72rem;
     letter-spacing: 0.3em;
     color: var(--text-muted);
     text-transform: uppercase;
-    margin-bottom: 8px;
+    z-index: 10;
+    pointer-events: none;
   }
 
-  #face-wrap {
-    filter: drop-shadow(0 0 32px rgba(124,106,245,0.18));
+  /* Bottom gradient overlay — houses all bottom UI */
+  #bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 12px 16px 20px;
+    background: linear-gradient(to top, rgba(13,13,15,0.88) 0%, rgba(13,13,15,0.40) 60%, transparent 100%);
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 10;
   }
 
-  #bip-face {
-    display: block;
-    width: min(80vw, 360px);
-    height: min(80vw, 360px);
+  /* Left: HUD bars + emotion label */
+  #left-hud {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex-shrink: 0;
+    pointer-events: none;
   }
 
-
-  .emotion-label { font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; margin-top: 10px; transition: color 0.5s; }
+  .emotion-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: color 0.5s;
+  }
   .emotion-euphoric  { color: #f5c842; }
   .emotion-happy     { color: #7c6af5; }
   .emotion-neutral   { color: var(--text-muted); }
@@ -53,20 +93,70 @@
   .emotion-tired     { color: #889988; }
   .emotion-exhausted { color: #667766; }
 
-  #points-label { display: none; font-size: 0.6rem; color: var(--text-muted); margin-top: 4px; }
+  #points-label { display: none; font-size: 0.55rem; color: var(--text-muted); }
 
-  #mood-hud  { display: flex; gap: 10px; margin-top: 6px; align-items: flex-end; }
-  .hud-col   { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .hud-bar   { width: 60px; height: 4px; background: #1e1e24; border-radius: 2px; overflow: hidden; }
+  #mood-hud  { display: flex; gap: 8px; align-items: flex-end; }
+  .hud-col   { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .hud-bar   { width: 48px; height: 3px; background: #1e1e24; border-radius: 2px; overflow: hidden; }
   .hud-fill  { height: 100%; width: 0%; transition: width 0.5s, background 0.5s; border-radius: 2px; }
-  .hud-lbl   { font-size: 0.42rem; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; }
-  #hud-charging { font-size: 0.65rem; color: #44aa66; display: none; margin-bottom: 1px;
+  .hud-lbl   { font-size: 0.38rem; color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  #hud-charging { font-size: 0.6rem; color: #44aa66; display: none; margin-bottom: 1px;
                   animation: blink-charge 1.2s infinite; align-self: flex-end; }
   @keyframes blink-charge { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  .stat-pop { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%);
+  /* Center: status + conversation */
+  #center-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    pointer-events: none;
+  }
+
+  #status-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    min-height: 1em;
+    letter-spacing: 0.1em;
+  }
+
+  #conversation {
+    background: rgba(22, 22, 26, 0.70);
+    backdrop-filter: blur(6px);
+    border-radius: 10px;
+    padding: 8px 11px;
+    pointer-events: none;
+  }
+  #transcript { font-size: 0.65rem; color: var(--text-muted); min-height: 1em; }
+  #response   { font-size: 0.75rem; color: var(--text); margin-top: 3px; min-height: 1em; line-height: 1.5; }
+
+  /* Mic button — right of bottom bar */
+  #mic-btn {
+    flex-shrink: 0;
+    width: 58px; height: 58px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: rgba(13,13,15,0.6);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, box-shadow 0.2s;
+    pointer-events: auto;
+  }
+  #mic-btn:hover { background: rgba(124,106,245,0.18); }
+  #mic-btn.listening { background: rgba(124,106,245,0.28); animation: pulse 1.2s infinite; }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(124,106,245,0.5); }
+    70%  { box-shadow: 0 0 0 18px rgba(124,106,245,0); }
+    100% { box-shadow: 0 0 0 0 rgba(124,106,245,0); }
+  }
+  #mic-btn svg { width: 25px; height: 25px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Stat pop-ups */
+  .stat-pop { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
     font-size: 0.75rem; font-family: 'Courier New', monospace; pointer-events: none;
-    animation: float-up 1.4s ease-out forwards; }
+    animation: float-up 1.4s ease-out forwards; z-index: 20; }
   .stat-pop.pos   { color: #44aa66; }
   .stat-pop.neg   { color: #aa4444; }
   .stat-pop.learn { color: #7c6af5; }
@@ -75,35 +165,8 @@
     100% { opacity: 0; transform: translateX(-50%) translateY(-44px); }
   }
 
-  #status-label { font-size: 0.7rem; color: var(--text-muted); min-height: 1.2em; margin-top: 18px; letter-spacing: 0.1em; }
-
-  #mic-btn {
-    margin-top: 28px;
-    width: 64px; height: 64px;
-    border-radius: 50%;
-    border: 2px solid var(--accent);
-    background: transparent;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s;
-  }
-  #mic-btn:hover { background: rgba(124,106,245,0.1); }
-  #mic-btn.listening { background: rgba(124,106,245,0.2); animation: pulse 1.2s infinite; }
-
-  @keyframes pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(124,106,245,0.5); }
-    70%  { box-shadow: 0 0 0 20px rgba(124,106,245,0); }
-    100% { box-shadow: 0 0 0 0 rgba(124,106,245,0); }
-  }
-
-  #mic-btn svg { width: 28px; height: 28px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-  #conversation { margin-top: 20px; width: min(90vw, 400px); text-align: center; }
-  #transcript   { font-size: 0.72rem; color: var(--text-muted); min-height: 1.2em; }
-  #response     { font-size: 0.82rem; color: var(--text); margin-top: 6px; min-height: 1.4em; line-height: 1.5; }
-
-  /* top-right nav */
-  .top-nav { position: fixed; top: 14px; right: 14px; display: flex; gap: 6px; }
+  /* Top-right nav */
+  .top-nav { position: fixed; top: 14px; right: 14px; display: flex; gap: 6px; z-index: 20; }
   .nav-btn {
     width: 34px; height: 34px;
     border: none; background: transparent;
@@ -114,6 +177,68 @@
   .nav-btn:hover { opacity: 1; }
   .nav-btn.open  { opacity: 1; transform: rotate(90deg); }
   .nav-btn svg   { width: 19px; height: 19px; stroke: var(--text); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Camera button */
+  #cam-btn {
+    flex-shrink: 0;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid #333344;
+    background: rgba(13,13,15,0.55);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0.6; transition: opacity 0.2s, border-color 0.2s;
+    pointer-events: auto;
+  }
+  #cam-btn:hover { opacity: 1; border-color: var(--accent); }
+  #cam-btn svg { width: 20px; height: 20px; stroke: var(--text); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Vision overlay */
+  #vision-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 150;
+    background: rgba(13,13,15,0.92);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px;
+  }
+  #vision-overlay.open { display: flex; }
+  #vision-video {
+    width: min(480px, 92vw); height: auto;
+    border-radius: 14px; border: 1px solid #333344;
+    background: #000; transform: scaleX(-1); /* mirror */
+  }
+  #vision-canvas { display: none; }
+  #vision-status {
+    font-size: 0.72rem; color: var(--text-muted); letter-spacing: 0.1em;
+    min-height: 1.2em; text-align: center;
+  }
+  #vision-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  #vision-capture-btn {
+    padding: 10px 24px; background: var(--accent); border: none; border-radius: 8px;
+    color: #fff; font-family: 'Courier New', monospace; font-size: 0.72rem;
+    letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer;
+    transition: background 0.2s;
+  }
+  #vision-capture-btn:hover { background: #6a59e0; }
+  #vision-capture-btn:disabled { opacity: 0.4; cursor: default; }
+  #vision-close-btn {
+    padding: 10px 16px; background: transparent; border: 1px solid #333344; border-radius: 8px;
+    color: var(--text-muted); font-family: 'Courier New', monospace; font-size: 0.72rem;
+    cursor: pointer; transition: color 0.2s;
+  }
+  #vision-close-btn:hover { color: var(--text); }
+
+
+  /* Face count badge on camera button */
+  #cam-face-count {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--accent); color: #fff;
+    font-size: 0.55rem; font-family: 'Courier New', monospace;
+    width: 16px; height: 16px; border-radius: 50%;
+    display: none; align-items: center; justify-content: center;
+  }
+  #cam-btn { position: relative; }
 
   /* Settings panel */
   #settings-panel {
@@ -190,7 +315,6 @@
     font-size: 0.72rem;
   }
   #debug-panel.open { transform: translateX(0); }
-
   #debug-btn.open { opacity: 1; }
 
   .acc-section { border-bottom: 1px solid #1a1a22; }
@@ -228,10 +352,8 @@
   .dbg-msg:last-child { border-bottom: none; }
   .dbg-msg .dbg-role { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); opacity: 0.7; }
   .dbg-msg .dbg-msg-text { color: var(--text); margin-top: 2px; }
-
   .dbg-empty { color: var(--text-muted); font-size: 0.62rem; font-style: italic; }
 
-  /* Editable stat inputs inside debug panel */
   .dbg-edit-wrap { display: flex; align-items: center; gap: 5px; }
   .dbg-edit-input {
     width: 48px; background: var(--surface2);
@@ -258,20 +380,17 @@
   }
   #save-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-  /* Sleep effects container */
+  /* Sleep effects */
   #sleep-fx {
     position: fixed; top: 0; left: 0;
     width: 100%; height: 100%;
     pointer-events: none; z-index: 10;
   }
-
-  /* Individual ZZZ particles */
   .zzz-particle {
     position: absolute;
     font-family: 'Courier New', monospace;
     color: var(--accent);
-    pointer-events: none;
-    opacity: 0;
+    pointer-events: none; opacity: 0;
     animation: zzz-rise var(--dur, 2.8s) ease-out forwards;
   }
   @keyframes zzz-rise {
@@ -280,8 +399,6 @@
     75%  { opacity: 0.7; }
     100% { opacity: 0;    transform: translateY(-70px) scale(1.1); }
   }
-
-  /* Dream emoji bubbles */
   .dream-bubble {
     position: absolute;
     background: rgba(22, 22, 26, 0.92);
@@ -290,8 +407,7 @@
     width: 46px; height: 46px;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.5rem;
-    pointer-events: none;
-    opacity: 0;
+    pointer-events: none; opacity: 0;
     animation: bubble-float var(--dur, 4.5s) ease-out forwards;
     box-shadow: 0 0 12px rgba(124, 106, 245, 0.15);
   }
@@ -301,48 +417,126 @@
     75%  { opacity: 0.85; }
     100% { opacity: 0; transform: translateY(-95px) scale(0.75); }
   }
+
+  /* Vision processing indicator */
+  #vision-proc {
+    display: none;
+    position: fixed; z-index: 160;
+    pointer-events: none;
+    flex-direction: column; align-items: center; gap: 6px;
+  }
+  #vision-proc.active { display: flex; }
+  #vision-proc-emoji {
+    font-size: 2rem;
+    animation: proc-pulse 0.6s ease-in-out infinite alternate;
+    filter: drop-shadow(0 0 8px rgba(124,106,245,0.7));
+  }
+  #vision-proc-bar {
+    width: 48px; height: 3px;
+    background: #1e1e24; border-radius: 2px; overflow: hidden;
+  }
+  #vision-proc-fill {
+    height: 100%; width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.18s linear;
+    animation: proc-scan 1.1s ease-in-out infinite;
+  }
+  @keyframes proc-pulse {
+    from { transform: scale(0.9); opacity: 0.7; }
+    to   { transform: scale(1.1); opacity: 1.0; }
+  }
+  @keyframes proc-scan {
+    0%   { margin-left: 0%;   width: 30%; }
+    50%  { margin-left: 70%;  width: 30%; }
+    100% { margin-left: 0%;   width: 30%; }
+  }
+
+  /* Touch ripple feedback */
+  .touch-ripple {
+    position: fixed; pointer-events: none; z-index: 15;
+    width: 40px; height: 40px; margin-left: -20px; margin-top: -20px;
+    border-radius: 50%; border: 2px solid rgba(124,106,245,0.6);
+    animation: ripple-out 0.5s ease-out forwards;
+  }
+  @keyframes ripple-out {
+    0%   { transform: scale(0.3); opacity: 0.9; }
+    100% { transform: scale(2.0); opacity: 0;   }
+  }
 </style>
 <% end %>
-
-<div id="robot-name">Amic</div>
 
 <div id="face-wrap">
   <canvas id="bip-face"></canvas>
 </div>
 
-<div id="emotion-label" class="emotion-label emotion-neutral">neutro</div>
-<div id="points-label"></div>
-<div id="mood-hud">
-  <div class="hud-col">
-    <div class="hud-bar"><div class="hud-fill" id="hud-emotion-fill"></div></div>
-    <span class="hud-lbl">humor</span>
-  </div>
-  <div class="hud-col">
-    <div class="hud-bar"><div class="hud-fill" id="hud-stamina-fill"></div></div>
-    <span class="hud-lbl">energia</span>
-  </div>
-  <div class="hud-col">
-    <div class="hud-bar"><div class="hud-fill" id="hud-battery-fill"></div></div>
-    <span class="hud-lbl">bateria</span>
-  </div>
-  <span id="hud-charging" title="Carregando">⚡</span>
-</div>
-<div id="status-label"></div>
+<div id="robot-name">Amic</div>
+<div id="user-chip"><%= current_user.name %></div>
 
 <div id="sleep-fx"></div>
 
-<button id="mic-btn" aria-label="Falar com Amic">
-  <svg viewBox="0 0 24 24">
-    <rect x="9" y="2" width="6" height="11" rx="3"/>
-    <path d="M5 10a7 7 0 0 0 14 0"/>
-    <line x1="12" y1="19" x2="12" y2="23"/>
-    <line x1="8"  y1="23" x2="16" y2="23"/>
-  </svg>
-</button>
+<div id="bottom-bar">
+  <div id="left-hud">
+    <div id="emotion-label" class="emotion-label emotion-neutral">neutro</div>
+    <div id="mood-hud">
+      <div class="hud-col">
+        <div class="hud-bar"><div class="hud-fill" id="hud-emotion-fill"></div></div>
+        <span class="hud-lbl">humor</span>
+      </div>
+      <div class="hud-col">
+        <div class="hud-bar"><div class="hud-fill" id="hud-stamina-fill"></div></div>
+        <span class="hud-lbl">energia</span>
+      </div>
+      <div class="hud-col">
+        <div class="hud-bar"><div class="hud-fill" id="hud-battery-fill"></div></div>
+        <span class="hud-lbl">bateria</span>
+      </div>
+      <span id="hud-charging" title="Carregando">⚡</span>
+    </div>
+    <div id="points-label"></div>
+  </div>
 
-<div id="conversation">
-  <div id="transcript"></div>
-  <div id="response"></div>
+  <div id="center-info">
+    <div id="status-label"></div>
+    <div id="conversation">
+      <div id="transcript"></div>
+      <div id="response"></div>
+    </div>
+  </div>
+
+  <button id="cam-btn" title="Amic ver">
+    <span id="cam-face-count"></span>
+    <svg viewBox="0 0 24 24">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+  </button>
+
+  <button id="mic-btn" aria-label="Falar com Amic">
+    <svg viewBox="0 0 24 24">
+      <rect x="9" y="2" width="6" height="11" rx="3"/>
+      <path d="M5 10a7 7 0 0 0 14 0"/>
+      <line x1="12" y1="19" x2="12" y2="23"/>
+      <line x1="8"  y1="23" x2="16" y2="23"/>
+    </svg>
+  </button>
+</div>
+
+<!-- Vision overlay -->
+<div id="vision-overlay">
+  <video id="vision-video" autoplay playsinline muted></video>
+  <canvas id="vision-canvas"></canvas>
+  <div id="vision-status">Iniciando câmera...</div>
+  <div id="vision-controls">
+    <button id="vision-capture-btn" disabled>Capturar</button>
+    <button id="vision-close-btn">Fechar</button>
+  </div>
+</div>
+
+<!-- Processing indicator — floats near Amic's head while vision runs -->
+<div id="vision-proc">
+  <div id="vision-proc-emoji">🔍</div>
+  <div id="vision-proc-bar"><div id="vision-proc-fill"></div></div>
 </div>
 
 <!-- Top nav -->
@@ -350,6 +544,15 @@
   <a href="/history" class="nav-btn" title="Histórico">
     <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
   </a>
+  <%= form_with url: logout_path, method: :delete, html: { style: 'display:inline' } do %>
+    <button type="submit" class="nav-btn" title="Sair (<%= current_user.name %>)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+    </button>
+  <% end %>
   <button id="debug-btn" class="nav-btn" title="Debug">
     <svg viewBox="0 0 24 24">
       <path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v1h-2v-1a1 1 0 0 0-1-1h-1v1a4 4 0 0 1-8 0V9H7a1 1 0 0 0-1 1v1H4v-1a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/>
@@ -371,64 +574,46 @@
     <h2>Debug — Estado do Amic</h2>
     <button id="debug-close">✕</button>
   </div>
-
   <div class="acc-section open" id="acc-status">
-    <div class="acc-header" data-acc="acc-status">
-      <span>Status</span><span class="acc-arrow">▶</span>
-    </div>
+    <div class="acc-header" data-acc="acc-status"><span>Status</span><span class="acc-arrow">▶</span></div>
     <div class="acc-body" id="dbg-status"></div>
   </div>
-
   <div class="acc-section" id="acc-memory">
-    <div class="acc-header" data-acc="acc-memory">
-      <span>Memórias</span><span class="acc-arrow">▶</span>
-    </div>
+    <div class="acc-header" data-acc="acc-memory"><span>Memórias</span><span class="acc-arrow">▶</span></div>
     <div class="acc-body" id="dbg-memory"></div>
   </div>
-
   <div class="acc-section" id="acc-code">
-    <div class="acc-header" data-acc="acc-code">
-      <span>Código Aprendido</span><span class="acc-arrow">▶</span>
-    </div>
+    <div class="acc-header" data-acc="acc-code"><span>Código Aprendido</span><span class="acc-arrow">▶</span></div>
     <div class="acc-body" id="dbg-code"></div>
   </div>
-
   <div class="acc-section" id="acc-conv">
-    <div class="acc-header" data-acc="acc-conv">
-      <span>Conversa Recente</span><span class="acc-arrow">▶</span>
-    </div>
+    <div class="acc-header" data-acc="acc-conv"><span>Conversa Recente</span><span class="acc-arrow">▶</span></div>
     <div class="acc-body" id="dbg-conv"></div>
   </div>
 </div>
 
-<!-- Settings overlay -->
+<!-- Settings overlay + panel -->
 <div id="settings-overlay"></div>
-
-<!-- Settings panel -->
 <div id="settings-panel" role="dialog" aria-label="Configurações">
   <div class="panel-header">
     <h2>Configurações</h2>
     <button id="panel-close">✕</button>
   </div>
-
   <div class="panel-section">
     <label class="panel-label" for="cfg-api-key">Chave da API Claude</label>
     <input id="cfg-api-key" type="password" class="panel-input" placeholder="sk-ant-..." autocomplete="off" />
     <span class="panel-hint">Salva apenas no seu navegador.</span>
   </div>
-
   <div class="panel-section">
     <label class="panel-label" for="cfg-name">Nome do robô</label>
     <input id="cfg-name" type="text" class="panel-input" placeholder="Amic" />
   </div>
-
   <div class="panel-section">
     <label class="panel-label" for="cfg-voice">Voz</label>
     <select id="cfg-voice" class="panel-select">
       <option value="">Padrão do sistema</option>
     </select>
   </div>
-
   <div class="panel-section">
     <div class="panel-row">
       <label class="panel-label" for="cfg-rate">Velocidade de fala</label>
@@ -436,7 +621,6 @@
     </div>
     <input id="cfg-rate" type="range" min="0.5" max="2" step="0.1" value="1" class="panel-range" />
   </div>
-
   <div class="panel-section">
     <label class="panel-label" for="cfg-lang">Idioma do reconhecimento</label>
     <select id="cfg-lang" class="panel-select">
@@ -446,7 +630,6 @@
       <option value="es-ES">Español</option>
     </select>
   </div>
-
   <div class="panel-section">
     <div class="panel-row">
       <div>
@@ -459,7 +642,6 @@
       </label>
     </div>
   </div>
-
   <button class="btn-save" id="cfg-save">Salvar</button>
   <div class="panel-info" id="cfg-info"></div>
   <button class="btn-reset" id="cfg-reset">Resetar memória do Amic</button>
@@ -468,25 +650,27 @@
 <div id="save-toast">Salvo!</div>
 
 <script type="module">
-  import { initFace, setExpression, setActivity }                            from '/js/face.js';
-  import { initRobot, handleUserMessage, getRobot, setRobot, getCodeLibrary, resetCodeLibrary, isSleeping, wakeUp } from '/js/robot.js';
-  import { listen, listenPTT, speak }                                        from '/js/voice.js';
-  import { loadMemory, saveMemory, resetMemory }                             from '/js/memory.js';
-  import { getEmotionState }                                                  from '/js/emotion.js';
-  import { getAvailableVoices }                                               from '/js/voice.js';
-  import { createSession, saveMessage, updateSession }                        from '/js/rails_api.js';
+  import { initFace, setExpression, setActivity, playExpression,
+           setDeviceOrientation, triggerShakeFX, getTouchZone }   from '/js/face.js';
+  import { analyzeFrame, findBestMatch }                          from '/js/vision.js';
+  import { initRobot, handleUserMessage, getRobot, setRobot,
+           getCodeLibrary, resetCodeLibrary, isSleeping, wakeUp } from '/js/robot.js';
+  import { listen, listenPTT, speak, getAvailableVoices }         from '/js/voice.js';
+  import { loadMemory, saveMemory, resetMemory }                   from '/js/memory.js';
+  import { getEmotionState }                                        from '/js/emotion.js';
+  import { createSession, saveMessage, updateSession }             from '/js/rails_api.js';
 
-  // ── face + robot ──
-  const svgEl        = document.getElementById('bip-face');
-  const micBtn       = document.getElementById('mic-btn');
-  const statusLabel  = document.getElementById('status-label');
-  const emotionLabel = document.getElementById('emotion-label');
-  const pointsLabel  = document.getElementById('points-label');
-  const transcriptEl = document.getElementById('transcript');
-  const responseEl   = document.getElementById('response');
-  const debugBtn     = document.getElementById('debug-btn');
-  const debugPanel   = document.getElementById('debug-panel');
-  const debugClose   = document.getElementById('debug-close');
+  const canvas      = document.getElementById('bip-face');
+  const micBtn      = document.getElementById('mic-btn');
+  const statusLabel = document.getElementById('status-label');
+  const emotionLabel= document.getElementById('emotion-label');
+  const pointsLabel = document.getElementById('points-label');
+  const transcriptEl= document.getElementById('transcript');
+  const responseEl  = document.getElementById('response');
+  const debugBtn    = document.getElementById('debug-btn');
+  const debugPanel  = document.getElementById('debug-panel');
+  const debugClose  = document.getElementById('debug-close');
+  const sleepFx     = document.getElementById('sleep-fx');
 
   function getVoiceOptions() {
     const mem = loadMemory();
@@ -494,65 +678,322 @@
   }
 
   const emotionColors = {
-    EUPHORIC: '#f5c842', HAPPY: '#7c6af5', NEUTRAL: '#555566',
-    SAD: '#5588bb', GRUMPY: '#bb5555', TIRED: '#889988', EXHAUSTED: '#667766'
+    EUPHORIC:'#f5c842', HAPPY:'#7c6af5', NEUTRAL:'#555566',
+    SAD:'#5588bb', GRUMPY:'#bb5555', TIRED:'#889988', EXHAUSTED:'#667766'
   };
 
   function updateUI(robot) {
     const state = getEmotionState(robot.emotionPoints, robot.stamina ?? 100);
-    emotionLabel.textContent = state.name;
-    emotionLabel.className = `emotion-label emotion-${state.key.toLowerCase()}`;
-
+    emotionLabel.textContent  = state.name;
+    emotionLabel.className    = `emotion-label emotion-${state.key.toLowerCase()}`;
     const ef = document.getElementById('hud-emotion-fill');
     const sf = document.getElementById('hud-stamina-fill');
-    ef.style.width = (robot.emotionPoints ?? 50) + '%';
+    ef.style.width      = (robot.emotionPoints ?? 50) + '%';
     ef.style.background = emotionColors[state.key] || '#555566';
     const s = robot.stamina ?? 100;
-    sf.style.width = s + '%';
+    sf.style.width      = s + '%';
     sf.style.background = s > 60 ? '#44aa66' : s > 30 ? '#aaaa44' : '#aa4444';
-
     const mem = loadMemory();
     if (mem.showDebug) {
       const lt = robot.memory?.long_term?.length ?? 0;
       const mt = robot.memory?.medium_term?.length ?? 0;
       const st = robot.memory?.short_term?.length ?? 0;
-      pointsLabel.textContent = `emoção: ${robot.emotionPoints} | stamina: ${robot.stamina ?? 100} | mem: ${lt}L ${mt}M ${st}S`;
+      pointsLabel.textContent = `emo:${robot.emotionPoints} stm:${robot.stamina??100} mem:${lt}L${mt}M${st}S`;
       pointsLabel.style.display = 'block';
     } else {
       pointsLabel.style.display = 'none';
     }
-
-    // Keep debug panel in sync whenever robot state changes
     updateDebugPanel();
   }
 
-  // Defer so CSS layout is complete before reading offsetWidth/offsetHeight
-  requestAnimationFrame(() => initFace(svgEl));
-  initRobot(svgEl, updateUI);
+  requestAnimationFrame(() => initFace(canvas));
+  initRobot(canvas, updateUI);
   updateUI(getRobot());
   const robot = getRobot();
   document.getElementById('robot-name').textContent = robot.name || 'Amic';
   document.title = robot.name || 'Amic';
 
-  // ── start Rails session ──
+  // Rails session
   let railsSessionId = sessionStorage.getItem('amic_session_id');
   if (!railsSessionId) {
     createSession(robot.name || 'Amic', robot.emotionPoints, robot.stamina ?? 100)
       .then(id => { railsSessionId = id; sessionStorage.setItem('amic_session_id', id); })
       .catch(() => {});
   }
-
-  // close session on unload
   window.addEventListener('beforeunload', () => {
     if (!railsSessionId) return;
     const r = getRobot();
     updateSession(railsSessionId, r.emotionPoints, r.stamina ?? 100).catch(() => {});
   });
 
-  // ── mic ──
+  // ── Audio context ─────────────────────────────────────────────────────────────
+  let _audioCtx = null;
+  function _getAudioCtx() {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return _audioCtx;
+  }
+
+  function _playRobotBleep() {
+    try {
+      const ctx = _getAudioCtx();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 180 + Math.random() * 120;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.035, ctx.currentTime + 0.08);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.45);
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5);
+    } catch {}
+  }
+
+  // Touch sounds
+  function _tone(type, freq, freqEnd, dur, vol, startDelay = 0) {
+    try {
+      const ctx = _getAudioCtx();
+      const now = ctx.currentTime + startDelay;
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = type; osc.frequency.setValueAtTime(freq, now);
+      if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, now + dur * 0.9);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(vol, now + Math.min(0.02, dur * 0.15));
+      gain.gain.linearRampToValueAtTime(0, now + dur);
+      osc.start(now); osc.stop(now + dur + 0.01);
+    } catch {}
+  }
+
+  function _playTouchSound(type) {
+    switch (type) {
+      case 'bonk':
+        _tone('triangle', 280, 90, 0.22, 0.06);
+        break;
+      case 'purr': {
+        // Warm pleasant low hum (head pet)
+        const freqs = [220, 277, 330];
+        freqs.forEach((f, i) => _tone('sine', f, f * 1.05, 0.35, 0.025, i * 0.04));
+        break;
+      }
+      case 'warm':
+        // Gentle warm tone (cheek)
+        _tone('sine', 440, 494, 0.28, 0.038);
+        break;
+      case 'hm':
+        _tone('sine', 340, 320, 0.28, 0.032);
+        break;
+      case 'beep':
+        _tone('sine', 660, null, 0.14, 0.042);
+        break;
+      case 'tickle': {
+        // Rapid random bleeps
+        for (let i = 0; i < 5; i++) {
+          _tone('square', 300 + Math.random() * 380, null, 0.04, 0.022, i * 0.055);
+        }
+        break;
+      }
+      case 'blink_ow':
+        // Quick descending "ow" — eyes poked
+        _tone('triangle', 520, 160, 0.18, 0.055);
+        break;
+      case 'mphf':
+        // Muffled thud — mouth touched
+        _tone('sine', 180, 120, 0.20, 0.05);
+        _tone('sawtooth', 190, 110, 0.18, 0.015);
+        break;
+      case 'annoyed':
+        // Dissonant buzz — too many touches
+        _tone('sawtooth', 180, 160, 0.30, 0.04);
+        _tone('square',   185, 165, 0.30, 0.025);
+        break;
+      case 'grumpy':
+        // Harsh descending complaint — very annoyed
+        _tone('sawtooth', 220, 80, 0.45, 0.055);
+        _tone('square',   110, 55, 0.40, 0.030);
+        break;
+      case 'shake':
+        _tone('sawtooth', 200, 50, 0.45, 0.05);
+        break;
+    }
+  }
+
+  // Touch ripple visual
+  function _spawnRipple(x, y) {
+    const el = document.createElement('div');
+    el.className = 'touch-ripple';
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  // ── Touch irritation system ───────────────────────────────────────────────────
+  // Per-zone hit count + global recent count, both decay over time.
+  const _zoneHits = { eyes:0, mouth:0, head_top:0, cheek:0, neck:0, chest:0, face:0 };
+  let _totalHits  = 0;
+
+  setInterval(() => {
+    for (const k in _zoneHits) _zoneHits[k] = Math.max(0, _zoneHits[k] - 0.7);
+    _totalHits = Math.max(0, _totalHits - 0.5);
+  }, 2500);
+
+  // ── Touch / Click interaction on canvas ───────────────────────────────────────
+  let _lastTouchTime = 0;
+
+  function _handleTouchAt(clientX, clientY) {
+    const zone = getTouchZone(clientX, clientY);
+
+    // Hard rule: lower body → absolutely no reaction
+    if (!zone || zone === 'lower_body') return;
+
+    _spawnRipple(clientX, clientY);
+    _zoneHits[zone] = (_zoneHits[zone] || 0) + 1;
+    _totalHits++;
+    const zc = _zoneHits[zone];
+
+    const veryAnnoyed = _totalHits > 18;
+    const annoyed     = _totalHits > 10;
+
+    // Global saturation override
+    if (veryAnnoyed) { playExpression('GRUMPY'); _playTouchSound('grumpy'); return; }
+    if (annoyed && zone !== 'head_top') { playExpression('WORRIED'); _playTouchSound('annoyed'); return; }
+
+    switch (zone) {
+      case 'head_top':
+        // Petting — pleasant until too much
+        if (zc <= 5) { playExpression('HAPPY');     _playTouchSound('purr'); }
+        else         { playExpression('SURPRISED'); _playTouchSound('bonk'); }
+        break;
+
+      case 'eyes':
+        // Always uncomfortable — eyes are sensitive
+        playExpression('SURPRISED');
+        _playTouchSound('blink_ow');
+        triggerShakeFX(0.35);
+        break;
+
+      case 'mouth':
+        // Uncomfortable — invaded personal space
+        playExpression('CONFUSED');
+        _playTouchSound('mphf');
+        break;
+
+      case 'cheek':
+        // Pleasant in moderation
+        if (zc <= 2)      { playExpression('HAPPY');   _playTouchSound('warm'); }
+        else if (zc <= 4) { playExpression('NEUTRAL');  _playTouchSound('hm'); }
+        else              { playExpression('GRUMPY');   _playTouchSound('annoyed'); }
+        break;
+
+      case 'neck':
+        // Ticklish — fun at first, irritating with excess
+        if (zc <= 2)      { playExpression('LAUGHING'); _playTouchSound('tickle'); }
+        else if (zc <= 5) { playExpression('WORRIED');  _playTouchSound('tickle'); }
+        else              { playExpression('GRUMPY');   _playTouchSound('annoyed'); }
+        break;
+
+      case 'chest':
+        playExpression(Math.random() < 0.5 ? 'HAPPY' : 'CURIOUS');
+        _playTouchSound('beep');
+        break;
+
+      case 'face':
+        playExpression('CURIOUS');
+        _playTouchSound('hm');
+        break;
+    }
+  }
+
+  canvas.addEventListener('touchstart', e => {
+    // iOS permission request on first touch
+    _requestMotionPermission();
+    const t = e.touches[0];
+    const now = Date.now();
+    if (now - _lastTouchTime < 800) return; // debounce
+    _lastTouchTime = now;
+    _handleTouchAt(t.clientX, t.clientY);
+  }, { passive: true });
+
+  canvas.addEventListener('mousedown', e => {
+    // Only react to clicks that aren't on UI elements
+    if (e.target !== canvas) return;
+    const now = Date.now();
+    if (now - _lastTouchTime < 200) return;
+    _lastTouchTime = now;
+    _handleTouchAt(e.clientX, e.clientY);
+  });
+
+  // ── Device orientation (tilt) ─────────────────────────────────────────────────
+  let _motionSetup = false;
+  function _setupDeviceListeners() {
+    if (_motionSetup) return;
+    _motionSetup = true;
+
+    window.addEventListener('deviceorientation', e => {
+      setDeviceOrientation(e.beta, e.gamma);
+    });
+
+    // Shake detection
+    let _lastAccel = { x: 0, y: 0, z: 0 };
+    let _shakeWindow = 0;
+    let _shakePeaks  = 0;
+    let _shakeCount  = 0;
+    let _lastShakeAt = 0;
+
+    window.addEventListener('devicemotion', e => {
+      const a = e.accelerationIncludingGravity;
+      if (!a) return;
+      const dx = Math.abs(a.x - _lastAccel.x);
+      const dy = Math.abs(a.y - _lastAccel.y);
+      const dz = Math.abs(a.z - _lastAccel.z);
+      _lastAccel = { x: a.x, y: a.y, z: a.z };
+      const now = Date.now();
+      if (dx + dy + dz > 18 && now - _lastShakeAt > 120) {
+        _lastShakeAt = now;
+        _shakePeaks++;
+        if (_shakePeaks >= 3) {
+          _shakePeaks = 0;
+          _handleShake();
+        }
+      }
+      // Reset peak counter if too much time passes
+      if (now - _shakeWindow > 800) {
+        _shakePeaks  = 0;
+        _shakeWindow = now;
+      }
+    });
+  }
+
+  async function _requestMotionPermission() {
+    if (_motionSetup) return;
+    if (typeof DeviceOrientationEvent?.requestPermission !== 'function') {
+      _setupDeviceListeners();
+      return;
+    }
+    try {
+      const p = await DeviceOrientationEvent.requestPermission();
+      if (p === 'granted') _setupDeviceListeners();
+    } catch {}
+  }
+
+  // On desktop, just set up listeners immediately
+  if (typeof DeviceOrientationEvent?.requestPermission !== 'function') {
+    _setupDeviceListeners();
+  }
+
+  // ── Shake reaction ────────────────────────────────────────────────────────────
+  let _shakeReactionIndex = 0;
+  const _shakeExpressions = ['SURPRISED', 'WORRIED', 'CONFUSED', 'EXCITED'];
+  function _handleShake() {
+    const expr = _shakeExpressions[_shakeReactionIndex % _shakeExpressions.length];
+    _shakeReactionIndex++;
+    triggerShakeFX(1.2 + Math.random() * 0.6);
+    playExpression(expr);
+    _playTouchSound('shake');
+  }
+
+  // ── Mic ───────────────────────────────────────────────────────────────────────
   let listening = false;
   micBtn.addEventListener('click', async () => {
-    // Wake up if sleeping
     if (isSleeping()) { wakeUp(); return; }
     if (listening) return;
     listening = true;
@@ -563,13 +1004,11 @@
       listening = false;
       return;
     }
-
     micBtn.classList.add('listening');
     statusLabel.textContent = 'Ouvindo...';
     transcriptEl.textContent = '';
     responseEl.textContent = '';
     setActivity('listen');
-
     const mem = loadMemory();
     let text;
     try { text = await listen(mem.voiceLang || 'pt-BR'); }
@@ -581,27 +1020,28 @@
       listening = false;
       return;
     }
-
     micBtn.classList.remove('listening');
-    statusLabel.textContent = 'Pensando...';
     transcriptEl.textContent = `Você: ${text}`;
-    setActivity('think');
 
-    // save user message to Rails
-    const r = getRobot();
-    if (railsSessionId) {
-      saveMessage(railsSessionId, 'user', text, r.emotionPoints, r.stamina ?? 100).catch(() => {});
+    // If Amic is waiting for someone's name, intercept mic input
+    if (_awaitingFaceName) {
+      statusLabel.textContent = '';
+      listening = false;
+      await _saveNewFace(text);
+      return;
     }
 
+    statusLabel.textContent = 'Pensando...';
+    setActivity('think');
+    const r = getRobot();
+    if (railsSessionId) saveMessage(railsSessionId, 'user', text, r.emotionPoints, r.stamina ?? 100).catch(() => {});
     const result = await handleUserMessage(text, {
       ...getVoiceOptions(),
       onChunk: (partial) => { responseEl.textContent = `Amic: ${partial}`; setActivity('speak'); },
       onEnd: () => setActivity('idle'),
     });
-
     if (result?.spokenText) {
       responseEl.textContent = `Amic: ${result.spokenText}`;
-      // save assistant message to Rails
       if (railsSessionId) {
         const r2 = getRobot();
         saveMessage(railsSessionId, 'assistant', result.spokenText, r2.emotionPoints, r2.stamina ?? 100).catch(() => {});
@@ -610,66 +1050,41 @@
       responseEl.textContent = result.error;
       setActivity('idle');
     }
-
     statusLabel.textContent = '';
     listening = false;
   });
 
-  const sleepFx = document.getElementById('sleep-fx');
+  // ── Sleep effects ─────────────────────────────────────────────────────────────
   let _sleepFxTimer = null;
-  let _audioCtx = null;
-
   const SLEEP_EMOJIS = ['💤', '⭐', '🌙', '💭', '✨', '🌟', '☁️', '🌠'];
 
-  function _getAudioCtx() {
-    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    return _audioCtx;
-  }
-
-  function _playRobotBleep() {
-    try {
-      const ctx = _getAudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 180 + Math.random() * 120;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.035, ctx.currentTime + 0.08);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.45);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.5);
-    } catch {}
-  }
-
   function _spawnZzzParticle() {
-    const rect = svgEl.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height * 0.28;
+    const cy = rect.top  + rect.height * 0.28;
     const el = document.createElement('div');
     el.className = 'zzz-particle';
-    const letters = ['Z', 'z', 'Z', 'zz', 'Zzz'];
+    const letters = ['Z','z','Z','zz','Zzz'];
     el.textContent = letters[Math.floor(Math.random() * letters.length)];
     const size = 0.65 + Math.random() * 0.75;
     el.style.fontSize = `${size}rem`;
-    el.style.left = `${cx + (Math.random() - 0.5) * 64}px`;
-    el.style.top  = `${cy + (Math.random() - 0.5) * 28}px`;
-    el.style.setProperty('--dur', `${2.2 + Math.random() * 1.6}s`);
+    el.style.left = `${cx + (Math.random()-0.5)*64}px`;
+    el.style.top  = `${cy + (Math.random()-0.5)*28}px`;
+    el.style.setProperty('--dur', `${2.2+Math.random()*1.6}s`);
     sleepFx.appendChild(el);
     el.addEventListener('animationend', () => el.remove());
   }
 
   function _spawnDreamBubble(emoji) {
-    const rect = svgEl.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height * 0.22;
+    const cy = rect.top  + rect.height * 0.22;
     const el = document.createElement('div');
     el.className = 'dream-bubble';
     el.textContent = emoji;
-    el.style.left = `${cx + (Math.random() - 0.5) * 110 - 23}px`;
-    el.style.top  = `${cy + (Math.random() - 0.5) * 44}px`;
-    el.style.setProperty('--dur', `${3.8 + Math.random() * 2}s`);
+    el.style.left = `${cx + (Math.random()-0.5)*110-23}px`;
+    el.style.top  = `${cy + (Math.random()-0.5)*44}px`;
+    el.style.setProperty('--dur', `${3.8+Math.random()*2}s`);
     sleepFx.appendChild(el);
     el.addEventListener('animationend', () => el.remove());
   }
@@ -678,28 +1093,16 @@
     let nextZ = 0, nextBleep = 0, nextEmoji = 0;
     _sleepFxTimer = setInterval(() => {
       const now = Date.now();
-      if (now > nextZ) {
-        _spawnZzzParticle();
-        nextZ = now + 1100 + Math.random() * 1200;
-      }
-      if (now > nextEmoji) {
-        const emoji = SLEEP_EMOJIS[Math.floor(Math.random() * SLEEP_EMOJIS.length)];
-        _spawnDreamBubble(emoji);
-        nextEmoji = now + 3500 + Math.random() * 3000;
-      }
-      if (now > nextBleep) {
-        _playRobotBleep();
-        nextBleep = now + 3200 + Math.random() * 4500;
-      }
+      if (now > nextZ)     { _spawnZzzParticle(); nextZ = now + 1100 + Math.random()*1200; }
+      if (now > nextEmoji) { _spawnDreamBubble(SLEEP_EMOJIS[Math.floor(Math.random()*SLEEP_EMOJIS.length)]); nextEmoji = now + 3500 + Math.random()*3000; }
+      if (now > nextBleep) { _playRobotBleep(); nextBleep = now + 3200 + Math.random()*4500; }
     }, 250);
   }
-
   function stopSleepEffects() {
     if (_sleepFxTimer) { clearInterval(_sleepFxTimer); _sleepFxTimer = null; }
     sleepFx.innerHTML = '';
   }
 
-  // ── sleep events ──
   document.addEventListener('amic:sleep', ({ detail }) => {
     if (detail.sleeping) {
       startSleepEffects();
@@ -712,7 +1115,6 @@
     }
   });
 
-  // ── spontaneous speech ──
   document.addEventListener('amic:spontaneous', async ({ detail }) => {
     if (!detail.text || listening) return;
     transcriptEl.textContent = '';
@@ -720,17 +1122,13 @@
     setActivity('speak');
     const mem = loadMemory();
     await speak(detail.text, {
-      voiceName: mem.voiceName || '',
-      rate: parseFloat(mem.voiceRate) || 1,
-      lang: mem.voiceLang || 'pt-BR',
+      voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate)||1, lang: mem.voiceLang||'pt-BR',
       onEnd: () => { setActivity('idle'); responseEl.textContent = ''; },
     });
   });
 
-  // ── dream wake-up ──
   document.addEventListener('amic:dream', async ({ detail }) => {
     if (!detail.text || listening) return;
-    // Show dream-specific emojis first
     const emojis = detail.dreamEmojis || [];
     if (emojis.length) {
       emojis.forEach((emoji, i) => setTimeout(() => _spawnDreamBubble(emoji), i * 380));
@@ -741,24 +1139,20 @@
     setActivity('speak');
     const mem = loadMemory();
     await speak(detail.text, {
-      voiceName: mem.voiceName || '',
-      rate: parseFloat(mem.voiceRate) || 1,
-      lang: mem.voiceLang || 'pt-BR',
+      voiceName: mem.voiceName||'', rate: parseFloat(mem.voiceRate)||1, lang: mem.voiceLang||'pt-BR',
       onEnd: () => { setActivity('idle'); responseEl.textContent = ''; },
     });
   });
 
-  // ── battery HUD ──
-  const chargingEl   = document.getElementById('hud-charging');
-  const batteryFill  = document.getElementById('hud-battery-fill');
   document.addEventListener('amic:battery-change', ({ detail }) => {
     const { level, charging } = detail;
-    batteryFill.style.width      = level + '%';
-    batteryFill.style.background = level > 50 ? '#44aa66' : level > 20 ? '#aaaa44' : '#aa4444';
-    chargingEl.style.display     = charging ? 'inline' : 'none';
+    const bf = document.getElementById('hud-battery-fill');
+    const chg = document.getElementById('hud-charging');
+    bf.style.width      = level + '%';
+    bf.style.background = level > 50 ? '#44aa66' : level > 20 ? '#aaaa44' : '#aa4444';
+    chg.style.display   = charging ? 'inline' : 'none';
   });
 
-  // ── stat pops ──
   function spawnPop(delta, type) {
     const el = document.createElement('div');
     el.className = `stat-pop ${delta > 0 ? 'pos' : 'neg'}`;
@@ -771,31 +1165,25 @@
     if (detail.dEmotion) spawnPop(detail.dEmotion, 'emotion');
     if (detail.dStamina) spawnPop(detail.dStamina, 'stamina');
   });
-
-  function spawnLearnPop(count) {
+  document.addEventListener('amic:learned', ({ detail }) => {
     const el = document.createElement('div');
     el.className = 'stat-pop learn';
-    el.textContent = `+${count} fato${count > 1 ? 's' : ''}`;
+    el.textContent = `+${detail.count} fato${detail.count > 1 ? 's' : ''}`;
     el.style.left = 'calc(50% + 60px)';
     document.body.appendChild(el);
     el.addEventListener('animationend', () => el.remove());
-  }
-  document.addEventListener('amic:learned', ({ detail }) => {
-    spawnLearnPop(detail.count);
   });
-
   document.addEventListener('amic:learning', ({ detail }) => {
     statusLabel.textContent = `aprendendo sobre "${detail.topic}"...`;
     setActivity('think');
   });
 
-  // ── PTT (hold Space) ──
+  // ── PTT (hold Space) ──────────────────────────────────────────────────────────
   let pttSession = null;
   document.addEventListener('keydown', async (e) => {
     if (e.code !== 'Space' || e.repeat || listening) return;
-    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+    if (['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)) return;
     e.preventDefault();
-    // Wake up if sleeping
     if (isSleeping()) { wakeUp(); return; }
     const stored = JSON.parse(localStorage.getItem('bip_data') || '{}');
     if (!stored.apiKey) {
@@ -824,18 +1212,13 @@
     statusLabel.textContent = 'Pensando...';
     transcriptEl.textContent = `Você: ${text}`;
     setActivity('think');
-
     const r = getRobot();
-    if (railsSessionId) {
-      saveMessage(railsSessionId, 'user', text, r.emotionPoints, r.stamina ?? 100).catch(() => {});
-    }
-
+    if (railsSessionId) saveMessage(railsSessionId, 'user', text, r.emotionPoints, r.stamina ?? 100).catch(() => {});
     const result = await handleUserMessage(text, {
       ...getVoiceOptions(),
       onChunk: (partial) => { responseEl.textContent = `Amic: ${partial}`; setActivity('speak'); },
       onEnd: () => setActivity('idle'),
     });
-
     if (result?.spokenText) {
       responseEl.textContent = `Amic: ${result.spokenText}`;
       if (railsSessionId) {
@@ -846,42 +1229,31 @@
       responseEl.textContent = result.error;
       setActivity('idle');
     }
-
     statusLabel.textContent = '';
     listening = false;
   });
 
-  // ── settings panel ──
+  // ── Settings panel ────────────────────────────────────────────────────────────
   const settingsBtn = document.getElementById('settings-btn');
   const panel       = document.getElementById('settings-panel');
   const overlay     = document.getElementById('settings-overlay');
   const closeBtn    = document.getElementById('panel-close');
   const toast       = document.getElementById('save-toast');
 
-  function openPanel() {
-    populatePanel();
-    panel.classList.add('open');
-    overlay.classList.add('open');
-    settingsBtn.classList.add('open');
-  }
-  function closePanel() {
-    panel.classList.remove('open');
-    overlay.classList.remove('open');
-    settingsBtn.classList.remove('open');
-  }
+  function openPanel()  { populatePanel(); panel.classList.add('open'); overlay.classList.add('open'); settingsBtn.classList.add('open'); }
+  function closePanel() { panel.classList.remove('open'); overlay.classList.remove('open'); settingsBtn.classList.remove('open'); }
   settingsBtn.addEventListener('click', () => panel.classList.contains('open') ? closePanel() : openPanel());
   closeBtn.addEventListener('click', closePanel);
   overlay.addEventListener('click', closePanel);
 
   function populatePanel() {
     const mem = loadMemory();
-    document.getElementById('cfg-api-key').value = mem.apiKey || '';
-    document.getElementById('cfg-name').value    = mem.name || 'Amic';
-    document.getElementById('cfg-rate').value    = mem.voiceRate || 1;
-    document.getElementById('cfg-rate-display').textContent = parseFloat(mem.voiceRate || 1).toFixed(1) + '×';
-    document.getElementById('cfg-debug').checked = mem.showDebug || false;
-    document.getElementById('cfg-lang').value    = mem.voiceLang || 'pt-BR';
-
+    document.getElementById('cfg-api-key').value  = mem.apiKey || '';
+    document.getElementById('cfg-name').value     = mem.name || 'Amic';
+    document.getElementById('cfg-rate').value     = mem.voiceRate || 1;
+    document.getElementById('cfg-rate-display').textContent = parseFloat(mem.voiceRate||1).toFixed(1)+'×';
+    document.getElementById('cfg-debug').checked  = mem.showDebug || false;
+    document.getElementById('cfg-lang').value     = mem.voiceLang || 'pt-BR';
     const lt = mem.memory?.long_term?.length ?? 0;
     const mt = mem.memory?.medium_term?.length ?? 0;
     const st = mem.memory?.short_term?.length ?? 0;
@@ -889,14 +1261,12 @@
       `Nascimento: ${new Date(mem.birthDate).toLocaleDateString('pt-BR')}<br>` +
       `Memória: ${lt} permanentes · ${mt} consolidadas · ${st} recentes<br>` +
       `Emoção: ${mem.emotionPoints ?? 50} pts · Stamina: ${mem.stamina ?? 100}/100`;
-
     const voiceSelect = document.getElementById('cfg-voice');
     voiceSelect.innerHTML = '<option value="">Padrão do sistema</option>';
     getAvailableVoices().then(voices => {
       voices.forEach(v => {
         const opt = document.createElement('option');
-        opt.value = v.name;
-        opt.textContent = `${v.name} (${v.lang})`;
+        opt.value = v.name; opt.textContent = `${v.name} (${v.lang})`;
         if (v.name === mem.voiceName) opt.selected = true;
         voiceSelect.appendChild(opt);
       });
@@ -904,9 +1274,8 @@
   }
 
   document.getElementById('cfg-rate').addEventListener('input', e => {
-    document.getElementById('cfg-rate-display').textContent = parseFloat(e.target.value).toFixed(1) + '×';
+    document.getElementById('cfg-rate-display').textContent = parseFloat(e.target.value).toFixed(1)+'×';
   });
-
   document.getElementById('cfg-save').addEventListener('click', () => {
     const mem = loadMemory();
     mem.apiKey    = document.getElementById('cfg-api-key').value.trim();
@@ -921,175 +1290,351 @@
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 2000);
   });
-
   document.getElementById('cfg-reset').addEventListener('click', () => {
     if (confirm('Tem certeza? O Amic vai perder toda a memória e renascer do zero.')) {
-      resetMemory();
-      resetCodeLibrary();
+      resetMemory(); resetCodeLibrary();
       sessionStorage.removeItem('amic_session_id');
       location.reload();
     }
   });
 
-  // ── Debug panel ──
-  function openDebug() {
-    debugPanel.classList.add('open');
-    debugBtn.classList.add('open');
-    updateDebugPanel();
-  }
-  function closeDebug() {
-    debugPanel.classList.remove('open');
-    debugBtn.classList.remove('open');
-  }
+  // ── Debug panel ───────────────────────────────────────────────────────────────
+  function openDebug()  { debugPanel.classList.add('open'); debugBtn.classList.add('open'); updateDebugPanel(); }
+  function closeDebug() { debugPanel.classList.remove('open'); debugBtn.classList.remove('open'); }
   debugBtn.addEventListener('click', () => debugPanel.classList.contains('open') ? closeDebug() : openDebug());
   debugClose.addEventListener('click', closeDebug);
 
-  // Accordion toggle
   document.querySelectorAll('.acc-header').forEach(hdr => {
-    hdr.addEventListener('click', () => {
-      hdr.closest('.acc-section').classList.toggle('open');
-    });
+    hdr.addEventListener('click', () => hdr.closest('.acc-section').classList.toggle('open'));
   });
 
   function row(key, val) {
     return `<div class="dbg-row"><span class="dbg-key">${key}</span><span class="dbg-val">${val}</span></div>`;
   }
-
   function editRow(key, val, id, min, max) {
-    return `<div class="dbg-row">
-      <span class="dbg-key">${key}</span>
-      <span class="dbg-val">
-        <span class="dbg-edit-wrap">
-          <input class="dbg-edit-input" id="${id}" type="number" min="${min}" max="${max}" value="${val}">
-          <button class="dbg-edit-btn" data-edit-target="${id}">✓</button>
-        </span>
-      </span>
-    </div>`;
+    return `<div class="dbg-row"><span class="dbg-key">${key}</span><span class="dbg-val">
+      <span class="dbg-edit-wrap">
+        <input class="dbg-edit-input" id="${id}" type="number" min="${min}" max="${max}" value="${val}">
+        <button class="dbg-edit-btn" data-edit-target="${id}">✓</button>
+      </span></span></div>`;
   }
 
   function updateDebugPanel() {
-    if(debugPanel === null) return;
-    if (!debugPanel || !debugPanel.classList.contains('open')) return;
+    if (!debugPanel?.classList.contains('open')) return;
     const robot = getRobot();
     const lib   = getCodeLibrary();
     const state = getEmotionState(robot.emotionPoints, robot.stamina ?? 100);
-
-    // — Status —
-    const skills = robot.skills || {};
-    const weak   = robot.weaknesses || {};
+    const skills = robot.skills || {}, weak = robot.weaknesses || {};
     document.getElementById('dbg-status').innerHTML = [
-      row('Nome', robot.name || 'Amic'),
+      row('Nome', robot.name||'Amic'),
       row('Nascimento', new Date(robot.birthDate).toLocaleDateString('pt-BR')),
       row('Estado emocional', `${state.name} (${state.key})`),
-      editRow('Emoção', robot.emotionPoints ?? 50, 'dbg-edit-emotion', 0, 100),
-      editRow('Stamina', robot.stamina ?? 100, 'dbg-edit-stamina', 0, 100),
-      row('Minutos falados', robot.totalTalkMinutes ?? 0),
+      editRow('Emoção', robot.emotionPoints??50, 'dbg-edit-emotion', 0, 100),
+      editRow('Stamina', robot.stamina??100, 'dbg-edit-stamina', 0, 100),
+      row('Minutos falados', robot.totalTalkMinutes??0),
       '<div class="dbg-tier">Habilidades</div>',
-      ...Object.entries(skills).map(([k, v]) => row(k, v)),
+      ...Object.entries(skills).map(([k,v]) => row(k,v)),
       '<div class="dbg-tier">Fraquezas</div>',
-      ...Object.entries(weak).map(([k, v]) => row(k, v)),
+      ...Object.entries(weak).map(([k,v]) => row(k,v)),
     ].join('');
 
-    // — Memórias —
     const mem = robot.memory || {};
-    const lt = mem.long_term || [];
-    const mt = mem.medium_term || [];
-    const st = mem.short_term || [];
+    const lt = mem.long_term||[], mt = mem.medium_term||[], st = mem.short_term||[];
     let memHtml = '';
-    if (lt.length) {
-      memHtml += `<span class="dbg-tier">Permanentes (${lt.length})</span>`;
-      memHtml += lt.map(f => `<div class="dbg-fact">${escHtml(typeof f === 'object' ? (f.content || f.text || JSON.stringify(f)) : f)}</div>`).join('');
-    }
-    if (mt.length) {
-      memHtml += `<span class="dbg-tier">Consolidadas (${mt.length})</span>`;
-      memHtml += mt.map(f => `<div class="dbg-fact">${escHtml(typeof f === 'object' ? (f.content || f.text || JSON.stringify(f)) : f)}</div>`).join('');
-    }
-    if (st.length) {
-      memHtml += `<span class="dbg-tier">Recentes (${st.length})</span>`;
-      memHtml += st.map(f => `<div class="dbg-fact">${escHtml(typeof f === 'object' ? (f.content || f.text || JSON.stringify(f)) : f)}</div>`).join('');
-    }
+    if (lt.length) { memHtml += `<span class="dbg-tier">Permanentes (${lt.length})</span>`; memHtml += lt.map(f=>`<div class="dbg-fact">${escHtml(typeof f==='object'?(f.content||f.text||JSON.stringify(f)):f)}</div>`).join(''); }
+    if (mt.length) { memHtml += `<span class="dbg-tier">Consolidadas (${mt.length})</span>`; memHtml += mt.map(f=>`<div class="dbg-fact">${escHtml(typeof f==='object'?(f.content||f.text||JSON.stringify(f)):f)}</div>`).join(''); }
+    if (st.length) { memHtml += `<span class="dbg-tier">Recentes (${st.length})</span>`; memHtml += st.map(f=>`<div class="dbg-fact">${escHtml(typeof f==='object'?(f.content||f.text||JSON.stringify(f)):f)}</div>`).join(''); }
     if (!memHtml) memHtml = '<span class="dbg-empty">Nenhuma memória ainda.</span>';
     document.getElementById('dbg-memory').innerHTML = memHtml;
 
-    // — Código Aprendido —
-    const exprs   = lib.expressions || {};
-    const actions = lib.actions     || {};
+    const exprs = lib.expressions||{}, actions = lib.actions||{};
     let codeHtml = '';
-
     const actionEntries = Object.entries(actions);
     if (actionEntries.length) {
       codeHtml += `<span class="dbg-tier">Ações nomeadas (${actionEntries.length})</span>`;
-      codeHtml += actionEntries.map(([name, { description, code, ts }]) => `
+      codeHtml += actionEntries.map(([name,{description,code,ts}]) => `
         <div class="dbg-code-item">
           <div class="dbg-code-name" onclick="this.closest('.dbg-code-item').classList.toggle('expanded')">
-            ▶ ${escHtml(name)}
-            <span style="opacity:0.55;font-size:0.58rem;font-weight:normal;letter-spacing:0"> — ${escHtml(description || '')}</span>
-            <span style="opacity:0.3;font-size:0.5rem"> ${ts ? new Date(ts).toLocaleTimeString('pt-BR') : ''}</span>
+            ▶ ${escHtml(name)} <span style="opacity:0.55;font-size:0.58rem"> — ${escHtml(description||'')}</span>
+            <span style="opacity:0.3;font-size:0.5rem"> ${ts?new Date(ts).toLocaleTimeString('pt-BR'):''}</span>
           </div>
           <pre class="dbg-code-detail">${escHtml(code)}</pre>
         </div>`).join('');
     }
-
     const exprEntries = Object.entries(exprs);
     if (exprEntries.length) {
       codeHtml += `<span class="dbg-tier">Expressões permanentes (${exprEntries.length})</span>`;
-      codeHtml += exprEntries.map(([name, { params, ts }]) => `
+      codeHtml += exprEntries.map(([name,{params,ts}]) => `
         <div class="dbg-code-item">
           <div class="dbg-code-name" onclick="this.closest('.dbg-code-item').classList.toggle('expanded')">
-            ▶ ${escHtml(name)} <span style="opacity:0.3;font-size:0.5rem">${ts ? new Date(ts).toLocaleTimeString('pt-BR') : ''}</span>
+            ▶ ${escHtml(name)} <span style="opacity:0.3;font-size:0.5rem">${ts?new Date(ts).toLocaleTimeString('pt-BR'):''}</span>
           </div>
-          <pre class="dbg-code-detail">${escHtml(JSON.stringify(params, null, 2))}</pre>
+          <pre class="dbg-code-detail">${escHtml(JSON.stringify(params,null,2))}</pre>
         </div>`).join('');
     }
-
     if (!codeHtml) codeHtml = '<span class="dbg-empty">Nenhum código aprendido ainda.</span>';
     document.getElementById('dbg-code').innerHTML = codeHtml;
 
-    // — Conversa Recente —
-    const history = (robot.conversationHistory || []).slice(-10);
-    if (history.length) {
-      document.getElementById('dbg-conv').innerHTML = history.map(m => `
-        <div class="dbg-msg">
-          <span class="dbg-role">${m.role === 'user' ? 'Você' : 'Amic'}</span>
-          <div class="dbg-msg-text">${escHtml(m.content)}</div>
-        </div>`).join('');
-    } else {
-      document.getElementById('dbg-conv').innerHTML = '<span class="dbg-empty">Nenhuma conversa ainda.</span>';
-    }
+    const history = (robot.conversationHistory||[]).slice(-10);
+    document.getElementById('dbg-conv').innerHTML = history.length
+      ? history.map(m=>`<div class="dbg-msg"><span class="dbg-role">${m.role==='user'?'Você':'Amic'}</span><div class="dbg-msg-text">${escHtml(m.content)}</div></div>`).join('')
+      : '<span class="dbg-empty">Nenhuma conversa ainda.</span>';
   }
 
-  // Editable stat fields — event delegation on the debug panel
   document.getElementById('dbg-status').addEventListener('click', (e) => {
     const btn = e.target.closest('.dbg-edit-btn');
     if (!btn) return;
-    const targetId = btn.dataset.editTarget;
-    const input = document.getElementById(targetId);
+    const input = document.getElementById(btn.dataset.editTarget);
     if (!input) return;
-    const val = Math.max(parseInt(input.min), Math.min(parseInt(input.max), parseInt(input.value) || 0));
+    const val = Math.max(parseInt(input.min), Math.min(parseInt(input.max), parseInt(input.value)||0));
     const r = getRobot();
-    if (targetId === 'dbg-edit-emotion') r.emotionPoints = val;
-    if (targetId === 'dbg-edit-stamina') r.stamina = val;
-    setRobot(r);
-    updateUI(r);
-    updateDebugPanel();
+    if (btn.dataset.editTarget === 'dbg-edit-emotion') r.emotionPoints = val;
+    if (btn.dataset.editTarget === 'dbg-edit-stamina') r.stamina = val;
+    setRobot(r); updateUI(r); updateDebugPanel();
   });
-
-  // Also apply on Enter key in the input
   document.getElementById('dbg-status').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
-    const input = e.target.closest('.dbg-edit-input');
-    if (!input) return;
-    input.closest('.dbg-edit-wrap')?.querySelector('.dbg-edit-btn')?.click();
+    e.target.closest('.dbg-edit-wrap')?.querySelector('.dbg-edit-btn')?.click();
   });
 
   function escHtml(s) {
-    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Brief code-activity flash when robot executes new code
   document.addEventListener('amic:code-executed', () => {
     setActivity('code');
     setTimeout(() => setActivity('idle'), 1800);
     updateDebugPanel();
   });
+
+  // ── Vision / Camera ───────────────────────────────────────────────────────────
+  const visionOverlay    = document.getElementById('vision-overlay');
+  const visionVideo      = document.getElementById('vision-video');
+  const visionCanvas     = document.getElementById('vision-canvas');
+  const visionStatus     = document.getElementById('vision-status');
+  const visionCaptureBtn = document.getElementById('vision-capture-btn');
+  const visionCloseBtn   = document.getElementById('vision-close-btn');
+  const visionProc       = document.getElementById('vision-proc');
+  const visionProcEmoji  = document.getElementById('vision-proc-emoji');
+  const camBtn           = document.getElementById('cam-btn');
+  const camFaceCount     = document.getElementById('cam-face-count');
+
+  let _cameraStream      = null;
+  let _knownProfiles     = [];
+  let _pendingNewFace    = null;   // face data awaiting a name via mic
+  let _awaitingFaceName  = false;  // mic input intercepted to save a face name
+  let _procSoundTimer    = null;   // scanning sound loop handle
+
+  async function _loadFaceProfiles() {
+    try {
+      const res = await fetch('/api/face_profiles', { credentials: 'same-origin' });
+      if (res.ok) _knownProfiles = await res.json();
+    } catch {}
+  }
+
+  // Position the processing indicator near Amic's head on the canvas
+  function _positionProcIndicator() {
+    const rect = canvas.getBoundingClientRect();
+    const cx = rect.left + rect.width * 0.62;
+    const cy = rect.top  + rect.height * 0.18;
+    visionProc.style.left = `${cx}px`;
+    visionProc.style.top  = `${cy}px`;
+  }
+
+  const PROC_EMOJIS = ['🔍','👁️','🧠','🔎','✨','💫'];
+  let _procEmojiIdx = 0;
+
+  function _startProcIndicator() {
+    _positionProcIndicator();
+    visionProc.classList.add('active');
+    visionProcEmoji.textContent = PROC_EMOJIS[0];
+    _procEmojiIdx = 0;
+    // Cycle emojis and play scanning tones every ~600ms
+    _procSoundTimer = setInterval(() => {
+      _procEmojiIdx = (_procEmojiIdx + 1) % PROC_EMOJIS.length;
+      visionProcEmoji.textContent = PROC_EMOJIS[_procEmojiIdx];
+      // Short scanning beep sequence
+      _tone('sine',  880, 1200, 0.08, 0.032, 0.00);
+      _tone('sine', 1200,  880, 0.08, 0.020, 0.10);
+    }, 600);
+    // Initial scan sound burst
+    _tone('square', 440, 660, 0.12, 0.025, 0.00);
+    _tone('square', 660, 880, 0.10, 0.022, 0.14);
+    _tone('sine',  1100, 800, 0.15, 0.030, 0.28);
+  }
+
+  function _stopProcIndicator() {
+    if (_procSoundTimer) { clearInterval(_procSoundTimer); _procSoundTimer = null; }
+    visionProc.classList.remove('active');
+    // Done sound — ascending chime
+    _tone('sine', 660,  880, 0.12, 0.035, 0.00);
+    _tone('sine', 880, 1100, 0.10, 0.030, 0.13);
+    _tone('sine',1100, 1320, 0.10, 0.028, 0.24);
+  }
+
+  async function openVision() {
+    await _loadFaceProfiles();
+    visionOverlay.classList.add('open');
+    visionCaptureBtn.disabled = true;
+    visionStatus.textContent  = 'Iniciando câmera...';
+    try {
+      _cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640 } });
+      visionVideo.srcObject = _cameraStream;
+      await new Promise(r => visionVideo.addEventListener('loadedmetadata', r, { once: true }));
+      visionCaptureBtn.disabled = false;
+      visionStatus.textContent  = 'Pronto — clique em Capturar.';
+    } catch (e) {
+      visionStatus.textContent = 'Câmera não disponível: ' + (e.message || e);
+    }
+  }
+
+  function _closeVision() {
+    visionOverlay.classList.remove('open');
+    if (_cameraStream) { _cameraStream.getTracks().forEach(t => t.stop()); _cameraStream = null; }
+    _stopProcIndicator();
+  }
+
+  async function _captureAndAnalyze() {
+    visionCaptureBtn.disabled = true;
+    visionStatus.textContent  = 'Analisando...';
+    setActivity('think');
+    _startProcIndicator();
+
+    visionCanvas.width  = visionVideo.videoWidth;
+    visionCanvas.height = visionVideo.videoHeight;
+    const ctx = visionCanvas.getContext('2d');
+    ctx.translate(visionCanvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(visionVideo, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    let faces;
+    try {
+      faces = await analyzeFrame(visionCanvas);
+    } catch (e) {
+      _stopProcIndicator();
+      visionStatus.textContent  = e.message;
+      visionCaptureBtn.disabled = false;
+      setActivity('idle');
+      return;
+    }
+
+    _stopProcIndicator();
+
+    if (!faces.length) {
+      visionStatus.textContent  = 'Nenhum rosto encontrado. Tente de novo.';
+      visionCaptureBtn.disabled = false;
+      setActivity('idle');
+      _tone('triangle', 380, 200, 0.25, 0.04);
+      return;
+    }
+
+    const results = faces.map(f => ({
+      ...f,
+      match: findBestMatch(f.descriptor, _knownProfiles),
+    }));
+
+    // Update last_seen for recognized faces
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+    for (const r of results) {
+      if (r.match) {
+        fetch(`/api/face_profiles/${r.match.profile.id}`, {
+          method: 'PATCH', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+          body: JSON.stringify({})
+        }).catch(() => {});
+      }
+    }
+
+    _closeVision();
+    setActivity('idle');
+
+    const unknown = results.filter(r => !r.match);
+    const known   = results.filter(r =>  r.match);
+
+    camFaceCount.textContent   = results.length;
+    camFaceCount.style.display = 'flex';
+    setTimeout(() => { camFaceCount.style.display = 'none'; }, 6000);
+
+    let visionText = '';
+    if (results.length === 1 && known.length === 1) {
+      const p = known[0].match.profile;
+      visionText = `Olá, ${p.nickname}! Que bom te ver.`;
+    } else if (results.length > 1) {
+      const names = known.map(r => r.match.profile.nickname);
+      visionText = `Vejo ${results.length} pessoas.`;
+      if (names.length) visionText += ` ${names.join(', ')}${names.length > 1 ? ', olá a todos!' : '!'}`;
+    } else if (!unknown.length) {
+      visionText = 'Não reconheço ninguém aqui.';
+    }
+
+    if (visionText) {
+      responseEl.textContent = `Amic: ${visionText}`;
+      playExpression('HAPPY');
+      const mem = loadMemory();
+      await speak(visionText, {
+        voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate) || 1, lang: mem.voiceLang || 'pt-BR',
+        onEnd: () => { setActivity('idle'); setTimeout(() => { responseEl.textContent = ''; }, 3000); },
+      });
+    }
+
+    // Unknown face(s) — Amic asks via speech, mic intercepts the answer
+    if (unknown.length >= 1) {
+      _pendingNewFace   = unknown[0];
+      _awaitingFaceName = true;
+      const askText = unknown.length === 1
+        ? 'Não conheço essa pessoa. Qual é o nome dela?'
+        : `Tem ${unknown.length} pessoas que não conheço. Como se chama a primeira?`;
+      responseEl.textContent = `Amic: ${askText}`;
+      playExpression('CURIOUS');
+      const mem = loadMemory();
+      speak(askText, {
+        voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate) || 1, lang: mem.voiceLang || 'pt-BR',
+        onEnd: () => { statusLabel.textContent = '🎤 Diga o nome...'; setActivity('listen'); },
+      });
+    }
+  }
+
+  async function _saveNewFace(nickname) {
+    if (!_pendingNewFace || !nickname.trim()) return;
+    const face        = _pendingNewFace;
+    _pendingNewFace   = null;
+    _awaitingFaceName = false;
+    statusLabel.textContent = '';
+    setActivity('think');
+
+    try {
+      const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+      const res  = await fetch('/api/face_profiles', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({
+          nickname:        nickname.trim(),
+          descriptor:      face.descriptor,
+          characteristics: { age: face.age, gender: face.gender }
+        })
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        _knownProfiles.push(saved);
+        const greeting = `Prazer em te conhecer, ${nickname.trim()}! Vou lembrar de você.`;
+        responseEl.textContent = `Amic: ${greeting}`;
+        playExpression('DELIGHTED');
+        const mem = loadMemory();
+        speak(greeting, {
+          voiceName: mem.voiceName||'', rate: parseFloat(mem.voiceRate)||1, lang: mem.voiceLang||'pt-BR',
+          onEnd: () => { setActivity('idle'); setTimeout(() => { responseEl.textContent = ''; }, 3000); },
+        });
+      }
+    } catch (e) {
+      console.error('Erro ao salvar rosto:', e);
+    }
+  }
+
+  camBtn.addEventListener('click', openVision);
+  visionCloseBtn.addEventListener('click', _closeVision);
+  visionCaptureBtn.addEventListener('click', _captureAndAnalyze);
+
+  // Amic can also request vision via event (e.g. from robot.js)
+  document.addEventListener('amic:vision-request', openVision);
 </script>

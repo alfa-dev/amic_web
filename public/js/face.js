@@ -11,9 +11,7 @@ const C = {
 };
 
 // ── Expressions ───────────────────────────────────────────────────────────────
-// All numeric: eyeScY, eyeRotZ, browLZ, browRZ, browY, mouthC, headRX, headRZ
 const EXPR = {
-  // Mood states (continuous)
   EUPHORIC:  { eyeScY: 1.10, eyeRotZ:  0,    browLZ:  0.26, browRZ: -0.26, browY:  0,     mouthC:  0.55, headRX: 0,     headRZ: 0    },
   HAPPY:     { eyeScY: 0.42, eyeRotZ:  0,    browLZ:  0.10, browRZ: -0.10, browY:  0,     mouthC:  0.35, headRX: 0,     headRZ: 0    },
   NEUTRAL:   { eyeScY: 0.88, eyeRotZ:  0,    browLZ:  0,    browRZ:  0,    browY:  0,     mouthC:  0.08, headRX: 0,     headRZ: 0    },
@@ -21,7 +19,6 @@ const EXPR = {
   GRUMPY:    { eyeScY: 0.58, eyeRotZ:  0.26, browLZ: -0.36, browRZ:  0.36, browY:  0,     mouthC: -0.46, headRX: 0,     headRZ: 0    },
   TIRED:     { eyeScY: 0.28, eyeRotZ:  0.06, browLZ:  0.08, browRZ: -0.08, browY:  0,     mouthC: -0.04, headRX: 0.08,  headRZ: 0    },
   EXHAUSTED: { eyeScY: 0.08, eyeRotZ:  0.04, browLZ:  0.05, browRZ: -0.05, browY:  0,     mouthC: -0.08, headRX: 0.18,  headRZ: 0    },
-  // Temporary expressions (2–5 s)
   SURPRISED: { eyeScY: 1.25, eyeRotZ:  0,    browLZ:  0.20, browRZ: -0.20, browY:  0.20,  mouthC:  0.00, headRX:-0.06,  headRZ: 0    },
   CURIOUS:   { eyeScY: 0.80, eyeRotZ:  0.04, browLZ:  0.20, browRZ:  0.02, browY:  0.10,  mouthC:  0.06, headRX: 0,     headRZ: 0.12 },
   DELIGHTED: { eyeScY: 0.20, eyeRotZ:  0,    browLZ:  0.18, browRZ: -0.18, browY:  0.12,  mouthC:  0.68, headRX:-0.02,  headRZ: 0    },
@@ -31,7 +28,7 @@ const EXPR = {
   CONFUSED:  { eyeScY: 0.72, eyeRotZ:  0.05, browLZ:  0.16, browRZ:  0.02, browY:  0.06,  mouthC: -0.06, headRX: 0,     headRZ: 0.14 },
   EXCITED:   { eyeScY: 1.18, eyeRotZ:  0,    browLZ:  0.26, browRZ: -0.26, browY:  0.16,  mouthC:  0.55, headRX:-0.06,  headRZ: 0    },
   BORED:     { eyeScY: 0.50, eyeRotZ:  0,    browLZ: -0.05, browRZ:  0.05, browY: -0.05,  mouthC: -0.10, headRX: 0.04,  headRZ: 0    },
-  SLEEPING:  { eyeScY: 0.02, eyeRotZ: 0,    browLZ:  0.06, browRZ: -0.06, browY: -0.04,  mouthC:  0.04, headRX: 0.22,  headRZ: 0.05 },
+  SLEEPING:  { eyeScY: 0.02, eyeRotZ:  0,    browLZ:  0.06, browRZ: -0.06, browY: -0.04,  mouthC:  0.04, headRX: 0.22,  headRZ: 0.05 },
 };
 
 const EXPR_DURATION = {
@@ -39,31 +36,25 @@ const EXPR_DURATION = {
   LAUGHING:  3000, WORRIED:  3500, CONFUSED:  4000, EXCITED:  3000, BORED: 3000,
 };
 
-// Register a custom expression at runtime (called by sandbox)
 export function registerExpression(name, params) {
   EXPR[name] = { ...EXPR.NEUTRAL, ...params };
   if (!EXPR_DURATION[name]) EXPR_DURATION[name] = 3000;
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let scene, camera, renderer, faceGroup, bodyGroup;
+let scene, camera, renderer, amicRoot, faceGroup, bodyGroup;
 let leftEye, rightEye, leftBrow, rightBrow, mouthMesh;
 let blinkYL = 1, blinkYR = 1;
 let talkTimer = null;
 let isTalking = false, talkPhase = false;
 
-// Materials stored for runtime color changes
 let headMat = null, bodyMat = null;
+let _overrides = {};
 
-// Sandbox-driven overrides (applied each tick on top of expression system)
-let _overrides = {};   // { leftEyeScale, rightEyeScale, headRZ }
-
-// LED activity indicators
 const LED_COUNT = 3;
 const ledMeshes = [];
 let ledActivity = 'idle';
 let ledPulseT   = 0;
-// [left, center, right] hex colors per activity
 const LED_PAL = {
   idle:   [0x05051a, 0x07071e, 0x05051a],
   listen: [0x003311, 0x00cc44, 0x003311],
@@ -84,36 +75,43 @@ let expressionTimer = null;
 const EYE_BASE_Y  = 1.18;
 const BROW_BASE_Y = 0.50;
 
-// ── Movement speed (set by emotion state) ─────────────────────────────────────
 let currentSpeed = 1.0;
 export function setMovementSpeed(s) { currentSpeed = Math.max(0.15, Math.min(2.0, s)); }
 
-// ── Natural idle movement state machine ───────────────────────────────────────
-// States: REST (still) → GLANCE (deliberate look) → SETTLE (return) → REST
+// ── Natural idle head movement ─────────────────────────────────────────────────
 let idlePhase      = 'rest';
 let idlePhaseEnd   = 0;
 let glanceTarget   = { y: 0, z: 0 };
 let microTremor    = { y: 0, z: 0 };
 let microTimer     = 0;
+let spring         = { y: { pos: 0, vel: 0 }, z: { pos: 0, vel: 0 } };
+let mouseNX = 0, mouseNY = 0;
 
-// Spring state per axis
-let spring = { y: { pos: 0, vel: 0 }, z: { pos: 0, vel: 0 } };
+// ── Walk drift (amicRoot position) ────────────────────────────────────────────
+let _walkIdleTarget = { x: 0, y: -0.2 };
+let _walkTarget     = { x: 0, y: -0.2 };
+let _walkPhaseEnd   = 0;
+let _walkSpring     = { x: { pos: 0, vel: 0 }, y: { pos: -0.2, vel: 0 } };
 
+// ── Device orientation & shake ────────────────────────────────────────────────
+let _devBeta = 0, _devGamma = 0;
+let _devBetaSm = 0, _devGammaSm = 0;
+let _shakeMag = 0;
+
+const _raycaster = new THREE.Raycaster();
+
+// ── Idle state machine ────────────────────────────────────────────────────────
 function tickIdle(t) {
   if (t < idlePhaseEnd) return;
-
   if (idlePhase === 'rest') {
-    // Glance probability scales with energy — energetic robots look around more
     const glanceChance = 0.25 * currentSpeed;
     if (Math.random() < glanceChance) {
       idlePhase = 'glance';
-      // Deliberate look — range scales with energy
       const range = 0.18 * currentSpeed;
       glanceTarget.y = (Math.random() - 0.5) * 2 * range;
       glanceTarget.z = (Math.random() - 0.5) * 2 * (range * 0.40);
       idlePhaseEnd = t + (1.0 + Math.random() * 1.8) / currentSpeed;
     } else {
-      // Stay still — longer pause for calmer emotions
       idlePhaseEnd = t + (2.5 + Math.random() * 6.0) / currentSpeed;
     }
   } else if (idlePhase === 'glance') {
@@ -129,11 +127,9 @@ function getIdleTarget() {
   const mxY = mouseNX * (idlePhase === 'rest' ? 0.045 : 0.07);
   const mxZ = -mouseNY * (idlePhase === 'rest' ? 0.018 : 0.025);
   if (idlePhase === 'glance') return { y: glanceTarget.y + mxY, z: glanceTarget.z + mxZ };
-  // rest / settle: near-zero with micro-tremor
   return { y: microTremor.y + mxY, z: microTremor.z + mxZ };
 }
 
-// Critically-damped spring: smooth and natural (zeta≥1 → no overshoot)
 function springStep(pos, target, vel, omega, zeta, dt) {
   const d     = pos - target;
   const accel = -omega * omega * d - 2 * zeta * omega * vel;
@@ -142,12 +138,45 @@ function springStep(pos, target, vel, omega, zeta, dt) {
   return { pos, vel };
 }
 
-let mouseNX = 0, mouseNY = 0;
+// ── Walk helpers ──────────────────────────────────────────────────────────────
+function _getWalkBounds() {
+  if (!camera) return { xMin: -2, xMax: 2, yMin: -1, yMax: 0.8 };
+  const fovRad = camera.fov * Math.PI / 180;
+  const halfH  = Math.tan(fovRad / 2) * camera.position.z;
+  const halfW  = halfH * camera.aspect;
+  return {
+    xMin: -(halfW - 1.1),
+    xMax:   halfW - 1.1,
+    yMin: -(halfH - 2.0),
+    yMax:   halfH - 2.0,
+  };
+}
+
+function _tickWalk(t, dt) {
+  if (t >= _walkPhaseEnd) {
+    const b = _getWalkBounds();
+    const e = Math.min(currentSpeed, 1.5);
+    _walkIdleTarget.x = (Math.random() - 0.5) * (b.xMax - b.xMin) * 0.55 * e;
+    _walkIdleTarget.y = b.yMin + Math.random() * (b.yMax - b.yMin) * 0.55 * e;
+    _walkPhaseEnd = t + (12 + Math.random() * 22) / Math.max(0.4, currentSpeed);
+  }
+  _walkTarget.x = _walkIdleTarget.x + _devGammaSm * 0.55;
+  _walkTarget.y = _walkIdleTarget.y - _devBetaSm  * 0.32;
+
+  const omega = 1.2, zeta = 0.88;
+  const sx = springStep(_walkSpring.x.pos, _walkTarget.x, _walkSpring.x.vel, omega, zeta, dt);
+  const sy = springStep(_walkSpring.y.pos, _walkTarget.y, _walkSpring.y.vel, omega, zeta, dt);
+  _walkSpring.x = sx;
+  _walkSpring.y = sy;
+  if (!amicRoot) return;
+  amicRoot.position.x = sx.pos;
+  amicRoot.position.y = sy.pos;
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 export function initFace(canvasEl) {
-  const W = canvasEl.offsetWidth  || 320;
-  const H = canvasEl.offsetHeight || 320;
+  const W = window.innerWidth  || 320;
+  const H = window.innerHeight || 320;
 
   renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -157,8 +186,8 @@ export function initFace(canvasEl) {
   renderer.toneMappingExposure = 1.6;
 
   scene  = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 50);
-  camera.position.z = 4.8;
+  camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 60);
+  camera.position.z = 11.0;
   camera.position.y = 0.15;
 
   scene.add(new THREE.AmbientLight(0xd8e8ff, 1.10));
@@ -167,12 +196,15 @@ export function initFace(canvasEl) {
   const rim = new THREE.PointLight(0xaa99ff, 1.0, 12); rim.position.set(3,0,2);  scene.add(rim);
   const bck = new THREE.PointLight(0x4488ff, 0.5, 15); bck.position.set(0,0,-5); scene.add(bck);
 
+  amicRoot  = new THREE.Group();
+  scene.add(amicRoot);
+
   faceGroup = new THREE.Group();
-  scene.add(faceGroup);
+  amicRoot.add(faceGroup);
 
   bodyGroup = new THREE.Group();
   bodyGroup.position.y = -0.88;
-  scene.add(bodyGroup);
+  amicRoot.add(bodyGroup);
 
   buildFace();
   scheduleNextBlink();
@@ -181,9 +213,10 @@ export function initFace(canvasEl) {
     mouseNX = (e.clientX / window.innerWidth  - 0.5) * 2;
     mouseNY = (e.clientY / window.innerHeight - 0.5) * 2;
   });
+
   window.addEventListener('resize', () => {
-    const w = canvasEl.offsetWidth  || 320;
-    const h = canvasEl.offsetHeight || 320;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
@@ -200,12 +233,8 @@ function buildFace() {
   faceGroup.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.72, 0.50, 16, 32), headMat));
 
   bodyMat = new THREE.MeshStandardMaterial({ color:C.head, emissive:C.headEmit, roughness:0.55 });
-  bodyGroup.add(new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.44, 0.28, 8, 24),
-    bodyMat
-  ));
+  bodyGroup.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.44, 0.28, 8, 24), bodyMat));
 
-  // ── LED indicator dots (chest area) ──────────────────────────────────────────
   const ledGeo = new THREE.SphereGeometry(0.052, 8, 8);
   const ledXPositions = [-0.19, 0, 0.19];
   for (let i = 0; i < LED_COUNT; i++) {
@@ -219,7 +248,6 @@ function buildFace() {
     ledMeshes.push(mesh);
   }
 
-  // Capsule eyes (pill / rounded-rectangle shape)
   const eyeMat = new THREE.MeshStandardMaterial({ color:C.eye, roughness:0.92 });
   const eyeGeo = new THREE.CapsuleGeometry(0.15, 0.10, 8, 16);
   leftEye  = new THREE.Mesh(eyeGeo, eyeMat.clone());
@@ -272,13 +300,34 @@ function tick() {
   const dt = 0.016;
   time += dt;
 
-  // Expression lerp — faster snap when showing expression, gentle drift back
+  // Walk drift
+  _tickWalk(time, dt);
+
+  // Smooth device orientation
+  _devBetaSm  += (_devBeta  - _devBetaSm)  * 0.06;
+  _devGammaSm += (_devGamma - _devGammaSm) * 0.06;
+
+  // Whole-body lean from device tilt
+  if (amicRoot) {
+    amicRoot.rotation.x = _devBetaSm  *  0.35;
+    amicRoot.rotation.z = _devGammaSm * -0.55;
+  }
+
+  // Shake FX — jitter on top of walk position
+  if (_shakeMag > 0.002 && amicRoot) {
+    amicRoot.position.x += (Math.random() - 0.5) * _shakeMag * 0.32;
+    amicRoot.position.y += (Math.random() - 0.5) * _shakeMag * 0.20;
+    _shakeMag *= 0.80;
+  } else if (_shakeMag <= 0.002) {
+    _shakeMag = 0;
+  }
+
+  // Expression lerp
   const lerpK = expressionTimer ? 0.14 : 0.07;
   for (const k of LERP_KEYS) cur[k] = lerp(cur[k] ?? 0, tgt[k] ?? 0, lerpK);
 
   leftEye.scale.set(1.0, EYE_BASE_Y * cur.eyeScY * blinkYL, 0.22);
   rightEye.scale.set(1.0, EYE_BASE_Y * cur.eyeScY * blinkYR, 0.22);
-  // Sandbox overrides — multipliers on top of expression system
   if (_overrides.leftEyeScale  !== undefined) leftEye.scale.y  *= Math.max(0, _overrides.leftEyeScale);
   if (_overrides.rightEyeScale !== undefined) rightEye.scale.y *= Math.max(0, _overrides.rightEyeScale);
   leftEye.rotation.z  =  cur.eyeRotZ;
@@ -289,14 +338,13 @@ function tick() {
   leftBrow.position.y  = BROW_BASE_Y + cur.browY;
   rightBrow.position.y = BROW_BASE_Y + cur.browY;
 
-  faceGroup.rotation.x = cur.headRX;
+  // Head tilt: expression + device lean
+  faceGroup.rotation.x = cur.headRX + _devBetaSm * 0.30;
 
   if (!isTalking && Math.abs(cur.mouthC - lastMouthC) > 0.003) rebuildMouth(cur.mouthC);
 
-  // ── Natural idle head movement ──────────────────────────────────────────────
   tickIdle(time);
 
-  // Micro-tremor: subtle random offset that refreshes every 0.4–1.2 s
   if (time > microTimer) {
     microTremor.y = (Math.random() - 0.5) * 0.006;
     microTremor.z = (Math.random() - 0.5) * 0.003;
@@ -304,22 +352,19 @@ function tick() {
   }
 
   const target = getIdleTarget();
-  // Well-damped spring (zeta=0.9 → no overshoot, very natural)
-  const omega = 5.0 * currentSpeed;
+  const omega  = 5.0 * currentSpeed;
   const sy = springStep(spring.y.pos, target.y, spring.y.vel, omega, 0.90, dt);
   const sz = springStep(spring.z.pos, target.z, spring.z.vel, omega, 0.90, dt);
   spring.y = { pos: sy.pos, vel: sy.vel };
   spring.z = { pos: sz.pos, vel: sz.vel };
 
   faceGroup.rotation.y = spring.y.pos;
-  faceGroup.rotation.z = spring.z.pos + cur.headRZ + (_overrides.headRZ ?? 0);
+  faceGroup.rotation.z = spring.z.pos + cur.headRZ + (_overrides.headRZ ?? 0) - _devGammaSm * 0.25;
 
-  // Breathing
   const br = 1 + Math.sin(time * 0.55) * 0.008;
   faceGroup.scale.setScalar(br);
   bodyGroup.scale.setScalar(br);
 
-  // LED update
   ledPulseT += dt;
   _updateLeds();
 
@@ -332,25 +377,18 @@ function _updateLeds() {
   for (let i = 0; i < ledMeshes.length; i++) {
     const mat = ledMeshes[i].material;
     let intensity = 0.1;
-
     if (ledActivity === 'idle') {
-      // Heartbeat: slow dim pulse
       intensity = 0.06 + Math.max(0, Math.sin(ledPulseT * 0.6)) * 0.08;
     } else if (ledActivity === 'listen') {
-      // Breathing green
       intensity = 0.35 + Math.sin(ledPulseT * 1.8) * 0.28;
     } else if (ledActivity === 'think') {
-      // Sequential orange chase (left → center → right)
       const phase = (ledPulseT * 3.0 - i * (Math.PI * 2 / 3)) % (Math.PI * 2);
       intensity = 0.2 + Math.max(0, Math.sin(phase)) * 0.75;
     } else if (ledActivity === 'speak') {
-      // All pulse blue together
       intensity = 0.35 + Math.sin(ledPulseT * 4.0) * 0.45;
     } else if (ledActivity === 'code') {
-      // Fast cyan strobe
       intensity = 0.5 + Math.sin(ledPulseT * 10 + i * 2.1) * 0.45;
     }
-
     const c = new THREE.Color(pal[i]);
     mat.color.set(c);
     mat.emissive.set(c);
@@ -360,16 +398,15 @@ function _updateLeds() {
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
-// ── Blink (subtle overshoot for softness) ────────────────────────────────────
+// ── Blink ─────────────────────────────────────────────────────────────────────
 function scheduleNextBlink() {
-  // Blink frequency scales slightly with energy
   const base = 2500 + (1 - Math.min(currentSpeed, 1.5)) * 1200;
   setTimeout(() => { blink(); scheduleNextBlink(); }, base + Math.random() * 3000);
 }
 function blink() {
   blinkYL = blinkYR = 0.04;
   setTimeout(() => {
-    blinkYL = blinkYR = 1.06;          // very slight overshoot
+    blinkYL = blinkYR = 1.06;
     setTimeout(() => { blinkYL = blinkYR = 1.0; }, 70);
   }, 90);
 }
@@ -388,8 +425,6 @@ function stopTalk() {
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
-
-// Continuous mood expression — reverts to this after any temporary expression
 export function setExpression(_canvasEl, stateKey, talking = false) {
   const e = EXPR[stateKey] || EXPR.NEUTRAL;
   moodExpression = { ...e };
@@ -398,7 +433,6 @@ export function setExpression(_canvasEl, stateKey, talking = false) {
   talking ? startTalk() : stopTalk();
 }
 
-// Temporary expression (2–5 s): face.js handles the timer internally
 export function playExpression(key) {
   const e = EXPR[key];
   if (!e) return;
@@ -410,13 +444,10 @@ export function playExpression(key) {
   }, EXPR_DURATION[key] ?? 3000);
 }
 
-// Set LED activity mode — controls all 3 LEDs as a group
 export function setActivity(type) {
   ledActivity = type || 'idle';
 }
 
-// Low-level face control object — returned to sandbox via getFaceAPI()
-// Robot writes code that calls these directly; no hardcoded behaviors here.
 export function getFaceAPI() {
   return {
     setHeadColor(hex) {
@@ -452,4 +483,64 @@ export function getFaceAPI() {
       mesh.material.emissiveIntensity = 0.9;
     },
   };
+}
+
+// ── Device orientation input ──────────────────────────────────────────────────
+// beta: forward-back tilt, normalized so 0 = upright phone
+// gamma: left-right tilt, degrees
+export function setDeviceOrientation(beta, gamma) {
+  _devBeta  = ((beta ?? 90) - 90) * Math.PI / 180;
+  _devGamma = (gamma ?? 0) * Math.PI / 180;
+}
+
+// ── Shake FX ──────────────────────────────────────────────────────────────────
+export function triggerShakeFX(magnitude = 1.0) {
+  _shakeMag = Math.max(_shakeMag, Math.min(2.0, magnitude));
+}
+
+// ── Touch zone raycasting ─────────────────────────────────────────────────────
+// Zones mapped to amicRoot local space (faceGroup.position.y = 0.52):
+//   Eyes center:  y ≈ 0.66  (faceGroup y=0.14 + 0.52)  x ≈ ±0.32
+//   Mouth center: y ≈ 0.26  (faceGroup y=-0.26 + 0.52)
+//   Head capsule: y -0.45 to +1.49
+//   Body capsule: y -1.46 to -0.30
+//   lower_body (y < -0.48) → NO REACTION, NO SOUND, hard rule
+export function getTouchZone(clientX, clientY) {
+  if (!renderer || !camera || !amicRoot) return null;
+  const canvas = renderer.domElement;
+  const rect   = canvas.getBoundingClientRect();
+  const ndcX   =  ((clientX - rect.left) / rect.width)  * 2 - 1;
+  const ndcY   = -((clientY - rect.top)  / rect.height) * 2 + 1;
+  _raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
+  const meshes = [];
+  faceGroup.traverse(o => { if (o.isMesh) meshes.push(o); });
+  bodyGroup.traverse(o => { if (o.isMesh) meshes.push(o); });
+  const hits = _raycaster.intersectObjects(meshes, false);
+  if (!hits.length) return null;
+  const local = amicRoot.worldToLocal(hits[0].point.clone());
+  const y  = local.y;
+  const ax = Math.abs(local.x);
+
+  // Hard no-reaction zone — lower body
+  if (y < -0.48) return 'lower_body';
+
+  // Body zones
+  if (y < -0.15) return 'chest';
+  if (y <  0.18) return 'neck';           // chin/throat area
+
+  // Face — check broad zones first, narrow last
+  // Cheeks: sides of face at eye/cheek level
+  if (ax > 0.52 && y <= 0.88) return 'cheek';
+
+  // Eyes: at y≈0.66, flanking x≈±0.32
+  if (y >= 0.48 && y <= 0.84 && ax >= 0.08 && ax <= 0.58) return 'eyes';
+
+  // Mouth: centered, below eyes
+  if (y >= 0.18 && y <= 0.52 && ax < 0.30) return 'mouth';
+
+  // Top of head (forehead → crown)
+  if (y >= 0.78) return 'head_top';
+
+  // General face (nose bridge / inter-eye area)
+  return 'face';
 }

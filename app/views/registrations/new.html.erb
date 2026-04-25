@@ -1,0 +1,66 @@
+<% content_for :title, "Criar conta — Amic" %>
+<% content_for :head do %>
+<style>
+  :root { --bg:#0d0d0f; --surface:#16161a; --surface2:#1e1e24; --accent:#7c6af5; --text:#ccccdd; --text-muted:#555566; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;
+       min-height:100dvh;display:flex;align-items:center;justify-content:center}
+  .auth-wrap{width:min(380px,92vw)}
+  .auth-logo{font-size:0.7rem;letter-spacing:0.4em;text-transform:uppercase;
+             color:var(--accent);text-align:center;margin-bottom:32px}
+  .auth-card{background:var(--surface);border:1px solid #222230;border-radius:14px;padding:32px}
+  .auth-title{font-size:0.75rem;letter-spacing:0.25em;text-transform:uppercase;
+              color:var(--text-muted);margin-bottom:24px}
+  .auth-field{margin-bottom:16px}
+  .auth-label{display:block;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;
+              color:var(--text-muted);margin-bottom:6px}
+  .auth-input{width:100%;background:var(--surface2);border:1px solid #2a2a35;border-radius:8px;
+              padding:11px 13px;color:var(--text);font-family:'Courier New',monospace;
+              font-size:0.82rem;outline:none;transition:border-color 0.2s}
+  .auth-input:focus{border-color:var(--accent)}
+  .auth-btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:8px;
+            color:#fff;font-family:'Courier New',monospace;font-size:0.75rem;
+            letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;
+            transition:background 0.2s;margin-top:8px}
+  .auth-btn:hover{background:#6a59e0}
+  .auth-alt{text-align:center;margin-top:20px;font-size:0.65rem;color:var(--text-muted)}
+  .auth-alt a{color:var(--accent);text-decoration:none}
+  .auth-alt a:hover{text-decoration:underline}
+  .auth-error{background:#1a0808;border:1px solid #4a1515;border-radius:8px;
+              padding:10px 13px;font-size:0.68rem;color:#cc5555;margin-bottom:16px}
+</style>
+<% end %>
+
+<div class="auth-wrap">
+  <div class="auth-logo">Amic</div>
+  <div class="auth-card">
+    <p class="auth-title">Criar conta</p>
+
+    <% if flash[:error] %>
+      <div class="auth-error"><%= flash[:error] %></div>
+    <% end %>
+
+    <%= form_with url: signup_path, method: :post do |f| %>
+      <div class="auth-field">
+        <%= f.label :name, 'Seu nome', class: 'auth-label' %>
+        <%= f.text_field :name, class: 'auth-input', autocomplete: 'name', autofocus: true %>
+      </div>
+      <div class="auth-field">
+        <%= f.label :email, 'E-mail', class: 'auth-label' %>
+        <%= f.email_field :email, class: 'auth-input', autocomplete: 'email' %>
+      </div>
+      <div class="auth-field">
+        <%= f.label :password, 'Senha (mín. 6 caracteres)', class: 'auth-label' %>
+        <%= f.password_field :password, class: 'auth-input', autocomplete: 'new-password' %>
+      </div>
+      <div class="auth-field">
+        <%= f.label :password_confirmation, 'Confirmar senha', class: 'auth-label' %>
+        <%= f.password_field :password_confirmation, class: 'auth-input', autocomplete: 'new-password' %>
+      </div>
+      <%= f.submit 'Criar conta', class: 'auth-btn' %>
+    <% end %>
+  </div>
+  <p class="auth-alt">
+    Já tem conta? <a href="<%= login_path %>">Entrar</a>
+  </p>
+</div>
