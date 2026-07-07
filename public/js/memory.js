@@ -1,5 +1,3 @@
-const STORAGE_KEY = 'bip_data';
-
 const DEFAULT_SKILLS = {
   communication: 1,
   creativity: 1,
@@ -27,124 +25,185 @@ const DEFAULT_STATE = {
   totalTalkMinutes: 0,
   sessionStart: null,
   apiKey: '',
+  groqApiKey: '',
   voiceName: '',
   voiceRate: 1,
   voiceLang: 'pt-BR',
+  elevenLabsApiKey: '',
+  elevenLabsVoiceId: '',
   showDebug: false,
 };
 
-export function loadMemory() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_STATE, birthDate: new Date().toISOString() };
+// ── In-memory cache (source of truth during the session) ─────────────────────
+let _cache = null;
+let _syncTimer = null;
 
-    const saved = JSON.parse(raw);
+function _csrfToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
 
-    // migrate old flat learnedFacts → short_term
-    if (saved.learnedFacts && !saved.memory) {
-      saved.memory = {
-        short_term: saved.learnedFacts.map(content => ({ content, importance: 2, last_used: 5 })),
-        medium_term: [],
-        long_term: [],
-      };
-      delete saved.learnedFacts;
-    }
-
-    return {
-      ...DEFAULT_STATE,
-      ...saved,
-      memory: { ...DEFAULT_STATE.memory, ...(saved.memory || {}) },
-      skills: { ...DEFAULT_SKILLS, ...(saved.skills || {}) },
-      weaknesses: { ...DEFAULT_WEAKNESSES, ...(saved.weaknesses || {}) },
+function _mergeDefaults(saved) {
+  // Migrate old flat learnedFacts → short_term
+  if (saved.learnedFacts && !saved.memory) {
+    saved.memory = {
+      short_term: saved.learnedFacts.map(content => ({ content, importance: 2, last_used: 5 })),
+      medium_term: [],
+      long_term: [],
     };
-  } catch {
-    return { ...DEFAULT_STATE, birthDate: new Date().toISOString() };
+    delete saved.learnedFacts;
   }
+  return {
+    ...DEFAULT_STATE,
+    ...saved,
+    memory:     { ...DEFAULT_STATE.memory,     ...(saved.memory     || {}) },
+    skills:     { ...DEFAULT_SKILLS,           ...(saved.skills     || {}) },
+    weaknesses: { ...DEFAULT_WEAKNESSES,       ...(saved.weaknesses || {}) },
+  };
+}
+
+async function _flushNow(state) {
+  try {
+    await fetch('/api/amic_state', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+      body: JSON.stringify({ state_data: state }),
+      keepalive: true,
+    });
+  } catch {}
+}
+
+function _scheduleSave() {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => _flushNow(_cache), 1500);
+}
+
+window.addEventListener('beforeunload', () => {
+  if (_cache) { clearTimeout(_syncTimer); _flushNow(_cache); }
+});
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+// Await this once before anything calls loadMemory().
+// Returns { state, codeLibrary } so both are initialized in one request.
+export async function initMemory() {
+  try {
+    const res = await fetch('/api/amic_state', { credentials: 'same-origin' });
+    if (res.ok) {
+      const { state_data, code_library } = await res.json();
+
+      // First time for this user — migrate from localStorage if data is there
+      if (!state_data) {
+        const localRaw  = localStorage.getItem('bip_data');
+        const localCode = localStorage.getItem('amic_code_library');
+        const migratedState = localRaw  ? (() => { try { return JSON.parse(localRaw);  } catch { return null; } })() : null;
+        const migratedLib   = localCode ? (() => { try { return JSON.parse(localCode); } catch { return null; } })() : null;
+
+        _cache = _mergeDefaults(migratedState || {});
+        if (!migratedState) _cache.birthDate = new Date().toISOString();
+
+        await _flushNow(_cache);
+        if (migratedLib) {
+          await fetch('/api/amic_state', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+            body: JSON.stringify({ code_library: migratedLib }),
+            keepalive: true,
+          });
+        }
+        localStorage.removeItem('bip_data');
+        localStorage.removeItem('amic_code_library');
+        return { state: _cache, codeLibrary: migratedLib };
+      }
+
+      _cache = _mergeDefaults(state_data);
+      return { state: _cache, codeLibrary: code_library };
+    }
+  } catch {}
+
+  // Fallback: fresh state (server unreachable)
+  _cache = { ...DEFAULT_STATE, birthDate: new Date().toISOString() };
+  return { state: _cache, codeLibrary: null };
+}
+
+export function loadMemory() {
+  if (!_cache) _cache = { ...DEFAULT_STATE, birthDate: new Date().toISOString() };
+  return _cache;
 }
 
 export function saveMemory(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  _cache = state;
+  _scheduleSave();
 }
 
 export function resetMemory() {
-  const current = loadMemory();
+  const current = _cache || loadMemory();
   const fresh = {
     ...DEFAULT_STATE,
-    birthDate: new Date().toISOString(),
-    name: current.name,
-    apiKey: current.apiKey,
-    voiceName: current.voiceName,
-    voiceRate: current.voiceRate,
-    voiceLang: current.voiceLang,
-    showDebug: current.showDebug,
+    birthDate:         new Date().toISOString(),
+    name:              current.name,
+    apiKey:            current.apiKey,
+    groqApiKey:        current.groqApiKey,
+    voiceName:         current.voiceName,
+    voiceRate:         current.voiceRate,
+    voiceLang:         current.voiceLang,
+    elevenLabsApiKey:  current.elevenLabsApiKey,
+    elevenLabsVoiceId: current.elevenLabsVoiceId,
+    showDebug:         current.showDebug,
   };
-  saveMemory(fresh);
+  _cache = fresh;
+  _flushNow(fresh);
   return fresh;
 }
 
-// Add a new fact to short_term. If already exists, reinforce it.
+// ── Facts ─────────────────────────────────────────────────────────────────────
+
 export function addFact(state, content, importance = 1) {
   const mem = state.memory;
   const all = [...mem.short_term, ...mem.medium_term, ...mem.long_term];
-  const existing = all.find(f => f.content === content);
-  if (existing) {
-    return reinforceFact(state, content);
-  }
+  if (all.find(f => f.content === content)) return reinforceFact(state, content);
   mem.short_term = [...mem.short_term, { content, importance, last_used: 0 }];
   return state;
 }
 
-// Increase importance of a known fact; may promote it to a higher tier.
 export function reinforceFact(state, content) {
   const mem = state.memory;
   for (const tier of ['short_term', 'medium_term', 'long_term']) {
     const idx = mem[tier].findIndex(f => f.content === content);
     if (idx !== -1) {
       mem[tier][idx].importance = Math.min(4, mem[tier][idx].importance + 1);
-      mem[tier][idx].last_used = 0;
+      mem[tier][idx].last_used  = 0;
       break;
     }
   }
-  promoteFacts(state);
+  _promoteFacts(state);
   return state;
 }
 
-function promoteFacts(state) {
+function _promoteFacts(state) {
   const mem = state.memory;
-
-  // short_term → medium_term when importance >= 3
   const toMedium = mem.short_term.filter(f => f.importance >= 3);
-  mem.short_term = mem.short_term.filter(f => f.importance < 3);
+  mem.short_term  = mem.short_term.filter(f => f.importance < 3);
   mem.medium_term = [...mem.medium_term, ...toMedium];
-
-  // medium_term → long_term when importance >= 4
   const toLong = mem.medium_term.filter(f => f.importance >= 4);
   mem.medium_term = mem.medium_term.filter(f => f.importance < 4);
-  mem.long_term = [...mem.long_term, ...toLong].slice(-80);
-
+  mem.long_term   = [...mem.long_term, ...toLong].slice(-80);
   mem.medium_term = mem.medium_term.slice(-40);
-  mem.short_term = mem.short_term.slice(-30);
+  mem.short_term  = mem.short_term.slice(-30);
 }
 
-// Called after each turn: age all facts, forget stale low-importance ones.
 export function ageFacts(state) {
   const mem = state.memory;
-
   const age = facts => facts.map(f => ({ ...f, last_used: f.last_used + 1 }));
-  mem.short_term = age(mem.short_term).filter(f => !(f.importance <= 1 && f.last_used > 15));
+  mem.short_term  = age(mem.short_term).filter(f => !(f.importance <= 1 && f.last_used > 15));
   mem.medium_term = age(mem.medium_term).filter(f => !(f.importance <= 2 && f.last_used > 40));
-  // long_term never forgotten
-
   return state;
 }
 
-// Returns all facts formatted for the system prompt.
 export function getAllFacts(state) {
   const mem = state.memory;
   if (!mem.long_term.length && !mem.medium_term.length && !mem.short_term.length) {
     return 'ainda não aprendi nada';
   }
-
   const lines = [];
   if (mem.long_term.length) {
     lines.push('Memórias permanentes (nunca esqueço):');
@@ -164,7 +223,7 @@ export function getAllFacts(state) {
 export function addConversation(state, role, content) {
   state.conversationHistory = [
     ...state.conversationHistory,
-    { role, content, ts: Date.now() }
+    { role, content, ts: Date.now() },
   ].slice(-50);
   return state;
 }

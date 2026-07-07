@@ -1,60 +1,70 @@
 // sandbox.js — Runtime code execution: robot learns and composes new behaviors
-// The robot writes JS from low-level primitives (api.face.*, api.after, etc.)
-// No behaviors are hardcoded here — the robot invents them.
-
-const STORAGE_KEY = 'amic_code_library';
 
 let codeLibrary = {
   version:     1,
-  expressions: {},  // { NAME: { params, ts } }           — replayed on load (registration)
-  actions:     {},  // { NAME: { code, description, ts } } — registered on load, NOT auto-run
-  behaviors:   {},  // legacy one-shot blocks               — NOT replayed
+  expressions: {},
+  actions:     {},
+  behaviors:   {},
 };
 
-// Injected from face.js via initSandbox
 let _registerExpression = null;
 let _getFaceAPI         = null;
 let _playExpressionFn   = null;
+let _registeredActions  = {};
+let _saveTimer          = null;
 
-// Named actions registered for this session (key → fn)
-let _registeredActions = {};
+function _csrfToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+
+function _scheduleSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    fetch('/api/amic_state', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+      body:    JSON.stringify({ code_library: codeLibrary }),
+      keepalive: true,
+    }).catch(() => {});
+  }, 1500);
+}
+
+window.addEventListener('beforeunload', () => {
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    fetch('/api/amic_state', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+      body:    JSON.stringify({ code_library: codeLibrary }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+});
+
+// Called from index.html.erb BEFORE initSandbox, with data from initMemory()
+export function preloadCodeLibrary(data) {
+  if (!data) return;
+  codeLibrary = {
+    version:     data.version     || 1,
+    expressions: data.expressions || {},
+    actions:     data.actions     || {},
+    behaviors:   data.behaviors   || {},
+  };
+}
 
 // initSandbox({ registerExpression, getFaceAPI, playExpression })
 export function initSandbox(fns = {}) {
-  _registerExpression = fns.registerExpression  || null;
-  _getFaceAPI         = fns.getFaceAPI          || null;
-  _playExpressionFn   = fns.playExpression      || null;
-  _load();
+  _registerExpression = fns.registerExpression || null;
+  _getFaceAPI         = fns.getFaceAPI         || null;
+  _playExpressionFn   = fns.playExpression     || null;
   return replayAll();
 }
 
-// ── Persistence ───────────────────────────────────────────────────────────────
-function _load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      codeLibrary = { ...codeLibrary, ...parsed };
-      // ensure actions key exists for old stored data
-      codeLibrary.actions = codeLibrary.actions || {};
-    }
-  } catch {}
-}
-
-function _save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(codeLibrary));
-}
-
 // ── Sandbox API ───────────────────────────────────────────────────────────────
-// This is the `api` object available inside every [CODE] block.
-// It exposes low-level face controls and timing — no pre-built behaviors.
 function createAPI() {
   return {
-    // Low-level face control — all methods composed by the robot
     face: _getFaceAPI?.() || {},
 
-    // ── Expressions ──────────────────────────────────────────────────────────
-    // Register a permanent named expression (replayed on startup)
     addExpression(name, params) {
       const key = String(name).toUpperCase().replace(/[^A-Z_]/g, '_');
       if (!key) return;
@@ -70,39 +80,30 @@ function createAPI() {
       };
       codeLibrary.expressions[key] = { params: clean, ts: Date.now() };
       _registerExpression?.(key, clean);
-      _save();
+      _scheduleSave();
       console.info(`[Amic sandbox] Expressão registrada: ${key}`);
     },
 
-    // Play a named expression temporarily (2–5 s)
     playExpression(name) {
       _playExpressionFn?.(String(name).toUpperCase());
     },
 
-    // ── Named actions ─────────────────────────────────────────────────────────
-    // Define a reusable named action — stored permanently, callable with api.do()
-    // name: identifier (e.g. 'WINK')
-    // description: human-readable (shown in debug panel + AI prompt)
-    // code: JS string run inside a new Function('api', code) when triggered
     defineAction(name, description, code) {
       const key = String(name).toUpperCase().replace(/[^A-Z_]/g, '_');
       if (!key || typeof code !== 'string') return;
       codeLibrary.actions[key] = { code: code.trim(), description: String(description), ts: Date.now() };
-      // Register for immediate use in this session
-      _registeredActions[key] = _makeRunner(code.trim());
-      _save();
+      _registeredActions[key]  = _makeRunner(code.trim());
+      _scheduleSave();
       console.info(`[Amic sandbox] Ação definida: ${key}`);
     },
 
-    // Execute a previously defined named action
     do(name) {
       const key = String(name).toUpperCase().replace(/[^A-Z_]/g, '_');
-      const fn = _registeredActions[key];
+      const fn  = _registeredActions[key];
       if (fn) fn();
       else console.warn(`[Amic sandbox] Ação desconhecida: ${key}`);
     },
 
-    // ── Timing ────────────────────────────────────────────────────────────────
     after(ms, fn)  { return setTimeout(fn, Number(ms)); },
     every(ms, fn)  { return setInterval(fn, Number(ms)); },
     stop(id)       { clearInterval(id); clearTimeout(id); },
@@ -122,21 +123,17 @@ function _makeRunner(code) {
 function num(v, fallback)  { return typeof v === 'number' && isFinite(v) ? v : fallback; }
 function clamp(v, lo, hi)  { return Math.max(lo, Math.min(hi, v)); }
 
-// ── Execute a code block (from [CODE]...[/CODE] in AI response) ───────────────
 export function executeSandboxCode(code, behaviorId) {
   if (!code?.trim()) return { success: false, error: 'empty code' };
   try {
     new Function('api', `"use strict";\n${code}`)(createAPI());
 
-    // Store as legacy behavior (for history/debug), but will NOT be replayed
     if (behaviorId) {
       codeLibrary.behaviors[behaviorId] = { code, ts: Date.now() };
-      _save();
+      _scheduleSave();
     }
 
-    document.dispatchEvent(new CustomEvent('amic:code-executed', {
-      detail: { behaviorId, code }
-    }));
+    document.dispatchEvent(new CustomEvent('amic:code-executed', { detail: { behaviorId, code } }));
     return { success: true };
   } catch (e) {
     console.warn('[Amic sandbox] Erro:', e.message);
@@ -144,32 +141,29 @@ export function executeSandboxCode(code, behaviorId) {
   }
 }
 
-// ── Replay on startup ─────────────────────────────────────────────────────────
-// Only re-registers definitions — does NOT run behaviors or actions.
 export function replayAll() {
   let n = 0;
-
-  // 1. Re-register permanent expressions
   for (const [key, { params }] of Object.entries(codeLibrary.expressions || {})) {
     _registerExpression?.(key, params);
     n++;
   }
-
-  // 2. Re-register named action functions (available to call, but not auto-run)
   for (const [key, { code }] of Object.entries(codeLibrary.actions || {})) {
     _registeredActions[key] = _makeRunner(code);
     n++;
   }
-
-  // Behaviors are intentionally NOT replayed (one-shot side effects)
-
   return n;
 }
 
 export function getCodeLibrary()  { return codeLibrary; }
 
 export function resetCodeLibrary() {
-  codeLibrary = { version: 1, expressions: {}, actions: {}, behaviors: {} };
+  codeLibrary        = { version: 1, expressions: {}, actions: {}, behaviors: {} };
   _registeredActions = {};
-  localStorage.removeItem(STORAGE_KEY);
+  clearTimeout(_saveTimer);
+  fetch('/api/amic_state', {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+    body:    JSON.stringify({ code_library: codeLibrary }),
+    keepalive: true,
+  }).catch(() => {});
 }

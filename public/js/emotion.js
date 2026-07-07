@@ -61,6 +61,13 @@ export function applyEvent(robot, event) {
     decay_tick:        -2,  // natural emotion decay toward baseline
     euphoric_drain:     0,  // no emotion change, only stamina (see below)
     learn_new:          4,  // learning something new is exciting
+    // Touch interactions
+    petted:             4,  // pleasant head pat
+    tickled:            3,  // tickle on neck — fun
+    face_seen:          3,  // saw a known face via camera
+    poked:             -3,  // physically bothered
+    annoyed_touch:     -6,  // touched too much
+    shaken:            -5,  // shaken
   };
 
   // Stamina is driven ONLY by battery level, sleep, and high-energy states.

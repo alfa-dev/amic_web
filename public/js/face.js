@@ -50,6 +50,8 @@ let isTalking = false, talkPhase = false;
 
 let headMat = null, bodyMat = null;
 let _overrides = {};
+let _headColorOverride = null;
+let _bodyColorOverride = null;
 
 const LED_COUNT = 3;
 const ledMeshes = [];
@@ -78,6 +80,31 @@ const BROW_BASE_Y = 0.50;
 let currentSpeed = 1.0;
 export function setMovementSpeed(s) { currentSpeed = Math.max(0.15, Math.min(2.0, s)); }
 
+export function setWalkIntent(intent) {
+  clearTimeout(_walkIntentTimer);
+  _walkIntentTimer = null;
+  _walkIntent = intent || 'still';
+  _walkPhaseEnd = 0; // force immediate recalc
+}
+
+// Set intent for `ms` milliseconds, then revert to 'still'
+export function setWalkIntentTimed(intent, ms) {
+  clearTimeout(_walkIntentTimer);
+  _walkIntent   = intent || 'still';
+  _walkPhaseEnd = 0;
+  _walkIntentTimer = setTimeout(() => {
+    _walkIntent      = 'still';
+    _walkPhaseEnd    = 0;
+    _walkIntentTimer = null;
+  }, ms);
+}
+export function getVisualStateDesc() {
+  const parts = [];
+  if (_headColorOverride) parts.push(`sua cabeça está na cor ${_headColorOverride} (você mesmo mudou com código)`);
+  if (_bodyColorOverride) parts.push(`seu corpo está na cor ${_bodyColorOverride}`);
+  return parts.join('; ');
+}
+
 // ── Natural idle head movement ─────────────────────────────────────────────────
 let idlePhase      = 'rest';
 let idlePhaseEnd   = 0;
@@ -92,6 +119,10 @@ let _walkIdleTarget = { x: 0, y: -0.2 };
 let _walkTarget     = { x: 0, y: -0.2 };
 let _walkPhaseEnd   = 0;
 let _walkSpring     = { x: { pos: 0, vel: 0 }, y: { pos: -0.2, vel: 0 } };
+// Intent: 'still'(default)|'excited'|'retreat'|'curious'|'neutral'
+// 'still' = near-center, barely moves; only explicit events override.
+let _walkIntent      = 'still';
+let _walkIntentTimer = null;
 
 // ── Device orientation & shake ────────────────────────────────────────────────
 let _devBeta = 0, _devGamma = 0;
@@ -156,9 +187,30 @@ function _tickWalk(t, dt) {
   if (t >= _walkPhaseEnd) {
     const b = _getWalkBounds();
     const e = Math.min(currentSpeed, 1.5);
-    _walkIdleTarget.x = (Math.random() - 0.5) * (b.xMax - b.xMin) * 0.55 * e;
-    _walkIdleTarget.y = b.yMin + Math.random() * (b.yMax - b.yMin) * 0.55 * e;
-    _walkPhaseEnd = t + (12 + Math.random() * 22) / Math.max(0.4, currentSpeed);
+    if (_walkIntent === 'still') {
+      // Default: barely moves, stays near center
+      _walkIdleTarget.x = (Math.random() - 0.5) * (b.xMax - b.xMin) * 0.08;
+      _walkIdleTarget.y = (Math.random() - 0.5) * (b.yMax - b.yMin) * 0.08;
+      _walkPhaseEnd = t + 40 + Math.random() * 40;
+    } else if (_walkIntent === 'retreat') {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      _walkIdleTarget.x = side * ((b.xMax * 0.50) + Math.random() * b.xMax * 0.35);
+      _walkIdleTarget.y = b.yMin + Math.random() * (b.yMax - b.yMin) * 0.30;
+      _walkPhaseEnd = t + (18 + Math.random() * 28) / Math.max(0.4, currentSpeed);
+    } else if (_walkIntent === 'excited') {
+      _walkIdleTarget.x = (Math.random() - 0.5) * (b.xMax - b.xMin) * 0.85 * e;
+      _walkIdleTarget.y = b.yMin + Math.random() * (b.yMax - b.yMin) * 0.78 * e;
+      _walkPhaseEnd = t + (6 + Math.random() * 10) / Math.max(0.4, currentSpeed);
+    } else if (_walkIntent === 'curious') {
+      _walkIdleTarget.x = (Math.random() - 0.5) * (b.xMax - b.xMin) * 0.38 * e;
+      _walkIdleTarget.y = (Math.random() - 0.5) * (b.yMax - b.yMin) * 0.38 * e;
+      _walkPhaseEnd = t + (10 + Math.random() * 16) / Math.max(0.4, currentSpeed);
+    } else {
+      // neutral
+      _walkIdleTarget.x = (Math.random() - 0.5) * (b.xMax - b.xMin) * 0.40 * e;
+      _walkIdleTarget.y = (Math.random() - 0.5) * (b.yMax - b.yMin) * 0.40 * e;
+      _walkPhaseEnd = t + (14 + Math.random() * 20) / Math.max(0.4, currentSpeed);
+    }
   }
   _walkTarget.x = _walkIdleTarget.x + _devGammaSm * 0.55;
   _walkTarget.y = _walkIdleTarget.y - _devBetaSm  * 0.32;
@@ -451,20 +503,24 @@ export function setActivity(type) {
 export function getFaceAPI() {
   return {
     setHeadColor(hex) {
+      _headColorOverride = hex;
       const c = new THREE.Color(hex);
       headMat?.color.set(c);
       headMat?.emissive.set(c.clone().multiplyScalar(0.18));
     },
     resetHeadColor() {
+      _headColorOverride = null;
       headMat?.color.set(C.head);
       headMat?.emissive.set(C.headEmit);
     },
     setBodyColor(hex) {
+      _bodyColorOverride = hex;
       const c = new THREE.Color(hex);
       bodyMat?.color.set(c);
       bodyMat?.emissive.set(c.clone().multiplyScalar(0.18));
     },
     resetBodyColor() {
+      _bodyColorOverride = null;
       bodyMat?.color.set(C.head);
       bodyMat?.emissive.set(C.headEmit);
     },
@@ -481,6 +537,15 @@ export function getFaceAPI() {
       mesh.material.color.set(c);
       mesh.material.emissive.set(c);
       mesh.material.emissiveIntensity = 0.9;
+    },
+    // walk(intent, durationMs?) — move with purpose for durationMs, then stop
+    // intent: 'excited'|'curious'|'retreat'|'neutral'|'still'
+    walk(intent, durationMs) {
+      if (durationMs && durationMs > 0) {
+        setWalkIntentTimed(intent, Number(durationMs));
+      } else {
+        setWalkIntent(intent);
+      }
     },
   };
 }

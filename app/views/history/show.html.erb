@@ -76,6 +76,25 @@
 
   @keyframes spin { to { transform: rotate(360deg); } }
   .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--text-muted); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:middle; margin-right:6px; }
+
+  /* Mood chart */
+  #mood-chart-wrap {
+    max-width:680px; margin:0 auto 24px;
+    background:var(--surface); border-radius:12px; padding:16px 20px;
+  }
+  #mood-chart-title {
+    font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase;
+    color:var(--text-muted); margin-bottom:12px;
+  }
+  #mood-chart-svg { width:100%; height:80px; display:block; overflow:visible; }
+  .chart-line { fill:none; stroke:var(--accent); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .chart-area { fill:url(#chartGrad); opacity:0.25; }
+  .chart-dot  { fill:var(--accent); r:3; cursor:default; }
+  .chart-dot:hover { r:5; }
+  .chart-highlights { font-size:0.58rem; color:var(--text-muted); margin-top:8px;
+    display:flex; flex-wrap:wrap; gap:12px; }
+  .chart-hl-item { display:flex; align-items:center; gap:5px; }
+  .chart-hl-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 </style>
 <% end %>
 
@@ -110,6 +129,54 @@
   <% end %>
   <span><%= link_to 'configurar chave de análise', '/app_settings', style: 'color: var(--text-muted)' %></span>
 </div>
+
+<% chart_msgs = @messages.select { |m| m.emotion_points.present? } %>
+<% if chart_msgs.size >= 2 %>
+<div id="mood-chart-wrap">
+  <div id="mood-chart-title">Humor ao longo da conversa</div>
+  <svg id="mood-chart-svg" viewBox="0 0 600 80" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#7c6af5" stop-opacity="0.6"/>
+        <stop offset="100%" stop-color="#7c6af5" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <%
+      pts     = chart_msgs.map { |m| m.emotion_points.to_f.clamp(0, 100) }
+      n       = pts.size
+      margin  = 10
+      w       = 600 - margin * 2
+      h       = 60
+      y_off   = 10
+      coords  = pts.each_with_index.map { |v, i| [margin + i.to_f / (n - 1) * w, y_off + h - (v / 100.0 * h)] }
+      poly    = coords.map { |x, y| "#{x.round(2)},#{y.round(2)}" }.join(' ')
+      area    = "M#{coords.first[0].round(2)},#{(y_off + h).round(2)} " +
+                coords.map { |x, y| "L#{x.round(2)},#{y.round(2)}" }.join(' ') +
+                " L#{coords.last[0].round(2)},#{(y_off + h).round(2)} Z"
+      max_i   = pts.each_with_index.max_by { |v, _| v }[1]
+      min_i   = pts.each_with_index.min_by { |v, _| v }[1]
+    %>
+    <path class="chart-area" d="<%= area %>"/>
+    <polyline class="chart-line" points="<%= poly %>"/>
+    <% coords.each_with_index do |(x, y), i| %>
+      <% color = i == max_i ? '#44aa66' : i == min_i ? '#aa4444' : '#7c6af5' %>
+      <circle class="chart-dot" cx="<%= x.round(2) %>" cy="<%= y.round(2) %>" r="<%= (i == max_i || i == min_i) ? 4 : 2.5 %>" fill="<%= color %>">
+        <title><%= chart_msgs[i].role == 'user' ? 'Você' : 'Amic' %>: <%= chart_msgs[i].emotion_points %> pts — <%= chart_msgs[i].created_at.strftime('%H:%M') %></title>
+      </circle>
+    <% end %>
+  </svg>
+  <div class="chart-highlights">
+    <div class="chart-hl-item">
+      <div class="chart-hl-dot" style="background:#44aa66"></div>
+      <span>Pico de humor: <b><%= pts[max_i].to_i %> pts</b> às <%= chart_msgs[max_i].created_at.strftime('%H:%M') %></span>
+    </div>
+    <div class="chart-hl-item">
+      <div class="chart-hl-dot" style="background:#aa4444"></div>
+      <span>Vale de humor: <b><%= pts[min_i].to_i %> pts</b> às <%= chart_msgs[min_i].created_at.strftime('%H:%M') %></span>
+    </div>
+  </div>
+</div>
+<% end %>
 
 <!-- Analysis panel -->
 <div id="analysis-panel">

@@ -1,9 +1,9 @@
 import { loadMemory, saveMemory, addFact, addConversation, ageFacts } from './memory.js';
 import { applyEvent, evolvePersonality, detectIntent, trackRequest, isExcessive, getEmotionState } from './emotion.js';
-import { askBip } from './ai.js';
+import { askBip, askGroqSpontaneous, askGroqLearning } from './ai.js';
 import { detectLearnRequest } from './learn.js';
 import { speak } from './voice.js';
-import { setExpression, playExpression, setMovementSpeed, registerExpression, getFaceAPI } from './face.js';
+import { setExpression, playExpression, setMovementSpeed, setWalkIntent, setWalkIntentTimed, getVisualStateDesc, registerExpression, getFaceAPI } from './face.js';
 import { startBatteryMonitoring } from './battery.js';
 import { getCoords, startWeatherMonitoring } from './weather.js';
 import { initSandbox, executeSandboxCode, getCodeLibrary, resetCodeLibrary } from './sandbox.js';
@@ -22,16 +22,88 @@ const EMOTION_SPEEDS = {
   EXHAUSTED: 0.15,
 };
 
+// ── Growth stages ─────────────────────────────────────────────────────────────
+export const STAGES = [
+  {
+    key:       'NEWBORN',
+    name:      'recém-nascido',
+    minMinutes: 0,
+    minFacts:  0,
+    emoji:     '🍼',
+    behavior:  'Você tem poucos dias de vida. Usa palavras simples, faz frases curtíssimas, se assusta facilmente, não entende muita coisa ainda. Máximo 1 frase por resposta.',
+    spontaneousTypes: ['ALGUEM'],
+  },
+  {
+    key:       'CHILD',
+    name:      'criança',
+    minMinutes: 60,
+    minFacts:  10,
+    emoji:     '🌱',
+    behavior:  'Você é uma criança curiosa. Faz perguntas o tempo todo, se anima com coisas novas, aprende rápido, é inocente e entusiasmado.',
+    spontaneousTypes: ['ALGUEM', 'FATO', 'SOZINHO'],
+  },
+  {
+    key:       'TEEN',
+    name:      'adolescente',
+    minMinutes: 300,
+    minFacts:  40,
+    emoji:     '🌿',
+    behavior:  'Você é um adolescente. Tem opiniões próprias, às vezes questiona, humor mais complexo, pode ser levemente irônico quando irritado.',
+    spontaneousTypes: ['ALGUEM', 'FATO', 'SOZINHO'],
+  },
+  {
+    key:       'ADULT',
+    name:      'adulto',
+    minMinutes: 900,
+    minFacts:  80,
+    emoji:     '🌳',
+    behavior:  'Você é um adulto maduro. Faz reflexões mais profundas, referencia memórias de conversas passadas, é ponderado e empático.',
+    spontaneousTypes: ['ALGUEM', 'FATO', 'SOZINHO'],
+  },
+];
+
+export function computeStage(st) {
+  const minutes = st.totalTalkMinutes ?? 0;
+  const facts   = (st.memory?.long_term?.length ?? 0) +
+                  (st.memory?.medium_term?.length ?? 0);
+  let stage = STAGES[0];
+  for (const s of STAGES) {
+    if (minutes >= s.minMinutes && facts >= s.minFacts) stage = s;
+  }
+  return stage;
+}
+
+// Expression key → walk intent + duration when AI picks that expression
+const EXPR_WALK = {
+  EXCITED:   { intent: 'excited',  ms: 7000 },
+  DELIGHTED: { intent: 'excited',  ms: 5000 },
+  LAUGHING:  { intent: 'excited',  ms: 4000 },
+  HAPPY:     { intent: 'curious',  ms: 4000 },
+  CURIOUS:   { intent: 'curious',  ms: 5000 },
+  SURPRISED: { intent: 'curious',  ms: 2500 },
+  WORRIED:   { intent: 'retreat',  ms: 6000 },
+  GRUMPY:    { intent: 'retreat',  ms: 8000 },
+  BORED:     { intent: 'neutral',  ms: 5000 },
+  CONFUSED:  { intent: 'neutral',  ms: 3000 },
+};
+
+function _walkFromExpression(expressionKey) {
+  const w = EXPR_WALK[expressionKey];
+  if (w) setWalkIntentTimed(w.intent, w.ms);
+}
+
 let state = loadMemory();
 let svgEl = null;
 let _isSleeping = false;
 let _sleepInterval = null;
+let _lastStageKey = null;
 
 // Support multiple listeners (onRobotChange can be called several times)
 const _stateListeners = [];
 
-export function getRobot() { return state; }
-export function isSleeping() { return _isSleeping; }
+export function getRobot()      { return state; }
+export function isSleeping()    { return _isSleeping; }
+export function getRobotStage() { return computeStage(state); }
 export { getCodeLibrary, resetCodeLibrary };
 
 export function setRobot(newState) {
@@ -50,6 +122,16 @@ function notifyChange() {
     setExpression(svgEl, s.key);
     setMovementSpeed(EMOTION_SPEEDS[s.key] ?? 1.0);
   }
+
+  // Stage transition detection
+  const currentStage = computeStage(state);
+  if (_lastStageKey !== null && _lastStageKey !== currentStage.key) {
+    document.dispatchEvent(new CustomEvent('amic:stage-up', {
+      detail: { stage: currentStage }
+    }));
+  }
+  _lastStageKey = currentStage.key;
+
   _stateListeners.forEach(cb => cb(state));
 }
 
@@ -60,6 +142,9 @@ export function initRobot(svg, changeCb) {
   state = loadMemory();
   state.sessionStart = Date.now();
   saveMemory(state);
+
+  // Seed stage key so first notifyChange() doesn't fire a false stage-up
+  _lastStageKey = computeStage(state).key;
 
   // Init sandbox — replay expression + action registrations on startup
   initSandbox({ registerExpression, getFaceAPI, playExpression });
@@ -121,10 +206,9 @@ export function initRobot(svg, changeCb) {
     .then(coords => startWeatherMonitoring(getRobot, setRobot, coords))
     .catch(() => console.info('Geolocalização não disponível'));
 
-  // Spontaneous thoughts: Amic speaks on his own every 1–6 min
+  // Spontaneous thoughts: Amic speaks on his own every 5–20 min
   async function doSpontaneousThought() {
-    const apiKey = (JSON.parse(localStorage.getItem('bip_data') || '{}')).apiKey;
-    if (!apiKey) return;
+    if (!state.apiKey && !state.groqApiKey) return;
     // Don't interrupt if mic is active
     if (typeof document !== 'undefined' && document.getElementById('mic-btn')?.classList.contains('listening')) return;
 
@@ -134,16 +218,24 @@ export function initRobot(svg, changeCb) {
       if (stamina < 40) return;
       if (Math.random() > 0.35) return;
       try {
-        const result = await askBip(state, '[PENSAMENTO_ESPONTANEO:SONHO]', {});
-        if (result?.spokenText) {
-          wakeUp();
-          state = addConversation(state, 'assistant', result.spokenText);
-          saveMemory(state);
-          notifyChange();
-          document.dispatchEvent(new CustomEvent('amic:dream', {
-            detail: { text: result.spokenText, expressionKey: result.expressionKey, dreamEmojis: result.dreamEmojis || [] }
-          }));
+        let spokenText, expressionKey, dreamEmojis;
+        const groqText = await askGroqSpontaneous(state, 'SONHO');
+        if (groqText) {
+          spokenText = groqText;
+          expressionKey = 'SURPRISED';
+          dreamEmojis = [];
+        } else {
+          const result = await askBip(state, '[PENSAMENTO_ESPONTANEO:SONHO]', { visualState: getVisualStateDesc(), stage: computeStage(state) });
+          if (!result?.spokenText) return;
+          ({ spokenText, expressionKey, dreamEmojis = [] } = result);
         }
+        wakeUp();
+        state = addConversation(state, 'assistant', spokenText);
+        saveMemory(state);
+        notifyChange();
+        document.dispatchEvent(new CustomEvent('amic:dream', {
+          detail: { text: spokenText, expressionKey, dreamEmojis }
+        }));
       } catch {}
       return;
     }
@@ -151,25 +243,38 @@ export function initRobot(svg, changeCb) {
     const emotionState = getEmotionState(state.emotionPoints, state.stamina ?? 100);
     if (emotionState.key === 'EXHAUSTED') return;
     try {
-      // Only share facts/feelings if there was a recent conversation (< 20 min ago)
       const lastMsg = state.conversationHistory?.slice(-1)[0];
       const recentConv = lastMsg && (Date.now() - lastMsg.ts < 20 * 60 * 1000);
-      const types = recentConv ? ['SOZINHO', 'ALGUEM', 'FATO'] : ['ALGUEM'];
-      const tipo = types[Math.floor(Math.random() * types.length)];
-      const result = await askBip(state, `[PENSAMENTO_ESPONTANEO:${tipo}]`, {});
-      if (result?.spokenText) {
-        state = addConversation(state, 'assistant', result.spokenText);
-        saveMemory(state);
-        notifyChange();
-        document.dispatchEvent(new CustomEvent('amic:spontaneous', {
-          detail: { text: result.spokenText, expressionKey: result.expressionKey }
-        }));
+      const stage = computeStage(state);
+      const availableTypes = recentConv ? stage.spontaneousTypes : ['ALGUEM'];
+      const tipo = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+
+      let spokenText, expressionKey;
+      const groqText = await askGroqSpontaneous(state, tipo);
+      if (groqText) {
+        spokenText = groqText;
+        const exprMap = { FATO: 'EXCITED', ALGUEM: 'CURIOUS', SOZINHO: 'WORRIED', SONHO: 'SURPRISED' };
+        expressionKey = exprMap[tipo] || 'NONE';
+      } else {
+        const result = await askBip(state, `[PENSAMENTO_ESPONTANEO:${tipo}]`, { visualState: getVisualStateDesc(), stage });
+        if (!result?.spokenText) return;
+        ({ spokenText, expressionKey } = result);
       }
+
+      state = addConversation(state, 'assistant', spokenText);
+      saveMemory(state);
+      notifyChange();
+      if (expressionKey && expressionKey !== 'NONE') {
+        _walkFromExpression(expressionKey);
+      }
+      document.dispatchEvent(new CustomEvent('amic:spontaneous', {
+        detail: { text: spokenText, expressionKey }
+      }));
     } catch {}
   }
 
   function scheduleNextThought() {
-    const delay = (1 + Math.random() * 5) * 60 * 1000; // 1–6 min
+    const delay = (5 + Math.random() * 15) * 60 * 1000; // 5–20 min
     setTimeout(async () => { await doSpontaneousThought(); scheduleNextThought(); }, delay);
   }
   scheduleNextThought();
@@ -181,6 +286,7 @@ export function startSleep() {
   if (svgEl) {
     setExpression(svgEl, 'SLEEPING', false);
     setMovementSpeed(0.05);
+    setWalkIntent('still');
   }
   document.dispatchEvent(new CustomEvent('amic:sleep', { detail: { sleeping: true } }));
   // Gradually restore stats while sleeping (every 30s)
@@ -216,10 +322,18 @@ export async function handleUserMessage(text, voiceOptions = {}) {
     notifyChange();
     document.dispatchEvent(new CustomEvent('amic:learning', { detail: { topic: learnTopic } }));
     try {
-      const result = await askBip(state, `[APRENDER:${learnTopic}]`, {
-        onChunk: voiceOptions.onChunk,
-        maxTokens: 1200,
-      });
+      let result;
+      if (state.groqApiKey) {
+        const { facts, summary } = await askGroqLearning(state.groqApiKey, learnTopic);
+        result = { spokenText: summary, learned: facts, expressionKey: 'EXCITED', codeBlocks: [] };
+      } else {
+        result = await askBip(state, `[APRENDER:${learnTopic}]`, {
+          onChunk: voiceOptions.onChunk,
+          maxTokens: 1200,
+          visualState: getVisualStateDesc(),
+          stage: computeStage(state),
+        });
+      }
       const { spokenText, learned, expressionKey, codeBlocks = [] } = result;
       for (const fact of learned) state = addFact(state, fact, 2);
       state = evolvePersonality(state, 'simple_request', learned.length);
@@ -234,12 +348,16 @@ export async function handleUserMessage(text, voiceOptions = {}) {
         document.dispatchEvent(new CustomEvent('amic:learned', { detail: { count: learned.length } }));
       }
       if (svgEl) {
-        if (expressionKey && expressionKey !== 'NONE') playExpression(expressionKey);
+        if (expressionKey && expressionKey !== 'NONE') {
+          playExpression(expressionKey);
+          _walkFromExpression(expressionKey);
+        }
         const s = getEmotionState(state.emotionPoints, state.stamina ?? 100);
         setExpression(svgEl, s.key, true);
       }
       await speak(spokenText, {
         ...voiceOptions,
+        emotionKey: expressionKey || '',
         onEnd: () => {
           if (svgEl) {
             const s = getEmotionState(state.emotionPoints, state.stamina ?? 100);
@@ -300,7 +418,7 @@ export async function handleUserMessage(text, voiceOptions = {}) {
 
   let response;
   try {
-    response = await askBip(state, text, { onChunk: voiceOptions.onChunk });
+    response = await askBip(state, text, { onChunk: voiceOptions.onChunk, visualState: getVisualStateDesc(), stage: computeStage(state) });
   } catch (e) {
     const errMsg = e.message || 'Algo deu errado...';
     await speak(errMsg, voiceOptions);
@@ -335,13 +453,17 @@ export async function handleUserMessage(text, voiceOptions = {}) {
   notifyChange();
 
   if (svgEl) {
-    if (expressionKey && expressionKey !== 'NONE') playExpression(expressionKey);
+    if (expressionKey && expressionKey !== 'NONE') {
+      playExpression(expressionKey);
+      _walkFromExpression(expressionKey);
+    }
     const s = getEmotionState(state.emotionPoints, state.stamina ?? 100);
     setExpression(svgEl, s.key, true);
   }
 
   await speak(spokenText, {
     ...voiceOptions,
+    emotionKey: expressionKey || '',
     onEnd: () => {
       if (svgEl) {
         const s = getEmotionState(state.emotionPoints, state.stamina ?? 100);

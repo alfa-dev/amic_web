@@ -23,7 +23,7 @@ export async function learnAbout(apiKey, topic) {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1400,
       system: `Você é um extrator de conhecimento. Dado um tópico, gere entre 8 e 20 fatos concisos em português brasileiro sobre APENAS esse tópico. Se for uma história ou conto, extraia os eventos narrativos em ordem cronológica. Se for um conceito, extraia informações factuais relevantes. Retorne SOMENTE um JSON válido no formato: {"facts": ["fato 1", "fato 2", ...], "summary": "resumo animado em 1 frase curta confirmando o aprendizado"}. Nada fora do JSON.`,
       messages: [{ role: 'user', content: topic }],

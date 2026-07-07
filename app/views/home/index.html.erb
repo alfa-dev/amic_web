@@ -354,6 +354,21 @@
   .dbg-msg .dbg-msg-text { color: var(--text); margin-top: 2px; }
   .dbg-empty { color: var(--text-muted); font-size: 0.62rem; font-style: italic; }
 
+  .log-entry { padding: 5px 0; border-bottom: 1px solid #16161a; font-size: 0.63rem; line-height: 1.4; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-entry .log-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .log-entry .log-time { color: var(--text-muted); font-size: 0.55rem; font-variant-numeric: tabular-nums; }
+  .log-badge { font-size: 0.48rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+  .log-badge-info  { background: #1a2a1a; color: #4caf50; }
+  .log-badge-warn  { background: #2a2200; color: #ffc107; }
+  .log-badge-error { background: #2a1010; color: #ef5350; }
+  .log-entry .log-action { color: var(--accent); font-size: 0.6rem; }
+  .log-entry .log-model  { color: var(--text-muted); font-size: 0.55rem; font-style: italic; }
+  .log-entry .log-msg    { color: var(--text); margin-top: 2px; word-break: break-all; }
+  .log-entry .log-details { margin-top: 3px; background: #0d0d0f; border-radius: 3px; padding: 4px 6px;
+    font-size: 0.58rem; color: #a0a0b0; white-space: pre-wrap; display: none; cursor: pointer; }
+  .log-entry.expanded .log-details { display: block; }
+
   .dbg-edit-wrap { display: flex; align-items: center; gap: 5px; }
   .dbg-edit-input {
     width: 48px; background: var(--surface2);
@@ -452,6 +467,77 @@
     100% { margin-left: 0%;   width: 30%; }
   }
 
+  /* Stage-up toast */
+  #stage-toast {
+    position: fixed; top: 60px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 12px 22px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    opacity: 0; transition: opacity 0.35s, transform 0.35s;
+    pointer-events: none; z-index: 200;
+    text-align: center;
+  }
+  #stage-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #stage-toast-emoji { font-size: 1.5rem; }
+  #stage-toast-title { font-size: 0.62rem; color: var(--accent); letter-spacing: 0.2em; text-transform: uppercase; }
+  #stage-toast-name  { font-size: 0.8rem; color: var(--text); }
+
+  /* Onboarding overlay */
+  #onboarding {
+    position: fixed; inset: 0; z-index: 300;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px;
+    padding: 24px;
+    transition: opacity 0.6s;
+  }
+  #onboarding.hidden { opacity: 0; pointer-events: none; }
+  #onboarding.gone   { display: none; }
+  #ob-bubble {
+    background: rgba(22,22,26,0.92);
+    border: 1px solid rgba(124,106,245,0.35);
+    border-radius: 18px;
+    padding: 16px 22px;
+    font-size: 0.9rem;
+    color: var(--text);
+    max-width: 320px;
+    text-align: center;
+    line-height: 1.6;
+    min-height: 3em;
+    transition: opacity 0.4s;
+  }
+  #ob-name-form {
+    display: none;
+    flex-direction: column; align-items: center; gap: 10px;
+  }
+  #ob-name-form.show { display: flex; }
+  #ob-name-input {
+    background: var(--surface2); border: 1px solid var(--accent);
+    border-radius: 10px; padding: 11px 16px;
+    color: var(--text); font-family: 'Courier New', monospace;
+    font-size: 0.85rem; text-align: center; outline: none;
+    width: 200px;
+  }
+  #ob-name-input::placeholder { color: var(--text-muted); }
+  #ob-confirm-btn {
+    padding: 10px 28px;
+    background: var(--accent); border: none; border-radius: 8px;
+    color: #fff; font-family: 'Courier New', monospace;
+    font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase;
+    cursor: pointer; transition: background 0.2s;
+  }
+  #ob-confirm-btn:hover { background: #6a59e0; }
+  #ob-skip {
+    font-size: 0.58rem; color: var(--text-muted); letter-spacing: 0.15em;
+    text-transform: uppercase; cursor: pointer; opacity: 0.5;
+    text-decoration: underline; border: none; background: transparent;
+  }
+  #ob-skip:hover { opacity: 1; }
+
   /* Touch ripple feedback */
   .touch-ripple {
     position: fixed; pointer-events: none; z-index: 15;
@@ -468,6 +554,16 @@
 
 <div id="face-wrap">
   <canvas id="bip-face"></canvas>
+</div>
+
+<!-- Onboarding overlay — shown on first run, hidden after -->
+<div id="onboarding" class="gone">
+  <div id="ob-bubble">...</div>
+  <div id="ob-name-form">
+    <input id="ob-name-input" type="text" maxlength="30" placeholder="seu nome" autocomplete="off" />
+    <button id="ob-confirm-btn">Confirmar</button>
+  </div>
+  <button id="ob-skip">pular</button>
 </div>
 
 <div id="robot-name">Amic</div>
@@ -590,6 +686,15 @@
     <div class="acc-header" data-acc="acc-conv"><span>Conversa Recente</span><span class="acc-arrow">▶</span></div>
     <div class="acc-body" id="dbg-conv"></div>
   </div>
+  <div class="acc-section" id="acc-logs">
+    <div class="acc-header" data-acc="acc-logs"><span>Log de Atividade</span><span class="acc-arrow">▶</span></div>
+    <div class="acc-body" id="dbg-logs">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+        <button id="dbg-logs-clear" style="font-size:0.58rem;padding:2px 8px;background:#1a1a22;border:1px solid #2a2a35;border-radius:4px;color:var(--text-muted);cursor:pointer">Limpar</button>
+      </div>
+      <div id="dbg-logs-list"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Settings overlay + panel -->
@@ -602,7 +707,22 @@
   <div class="panel-section">
     <label class="panel-label" for="cfg-api-key">Chave da API Claude</label>
     <input id="cfg-api-key" type="password" class="panel-input" placeholder="sk-ant-..." autocomplete="off" />
-    <span class="panel-hint">Salva apenas no seu navegador.</span>
+    <span class="panel-hint">Usada para a conversa principal. Salva apenas no seu navegador.</span>
+  </div>
+  <div class="panel-section">
+    <label class="panel-label" for="cfg-groq-key">Chave da API Groq <span style="font-size:0.75em;color:var(--accent)">(grátis)</span></label>
+    <input id="cfg-groq-key" type="password" class="panel-input" placeholder="gsk_..." autocomplete="off" />
+    <span class="panel-hint">Usada para pensamentos espontâneos e aprendizado — tier gratuito disponível em <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a>.</span>
+  </div>
+  <div class="panel-section">
+    <label class="panel-label" for="cfg-el-key">ElevenLabs — Chave da API</label>
+    <input id="cfg-el-key" type="password" class="panel-input" placeholder="sk_..." autocomplete="off" />
+    <span class="panel-hint">Voz expressiva. Deixe vazio para usar a voz do sistema.</span>
+  </div>
+  <div class="panel-section">
+    <label class="panel-label" for="cfg-el-voice">ElevenLabs — Voice ID</label>
+    <input id="cfg-el-voice" type="text" class="panel-input" placeholder="21m00Tcm4TlvDq8ikWAM" autocomplete="off" />
+    <span class="panel-hint">ID da voz escolhida na <a href="https://elevenlabs.io/app/voice-library" target="_blank" style="color:var(--accent)">biblioteca ElevenLabs</a>. Vazio = Rachel (padrão).</span>
   </div>
   <div class="panel-section">
     <label class="panel-label" for="cfg-name">Nome do robô</label>
@@ -649,16 +769,25 @@
 
 <div id="save-toast">Salvo!</div>
 
+<div id="stage-toast">
+  <div id="stage-toast-emoji"></div>
+  <div id="stage-toast-title">Novo estágio</div>
+  <div id="stage-toast-name"></div>
+</div>
+
 <script type="module">
   import { initFace, setExpression, setActivity, playExpression,
            setDeviceOrientation, triggerShakeFX, getTouchZone }   from '/js/face.js';
   import { analyzeFrame, findBestMatch }                          from '/js/vision.js';
   import { initRobot, handleUserMessage, getRobot, setRobot,
-           getCodeLibrary, resetCodeLibrary, isSleeping, wakeUp } from '/js/robot.js';
+           getCodeLibrary, resetCodeLibrary, isSleeping, wakeUp,
+           getRobotStage }                                         from '/js/robot.js';
   import { listen, listenPTT, speak, getAvailableVoices }         from '/js/voice.js';
-  import { loadMemory, saveMemory, resetMemory }                   from '/js/memory.js';
-  import { getEmotionState }                                        from '/js/emotion.js';
+  import { initMemory, loadMemory, saveMemory, resetMemory }       from '/js/memory.js';
+  import { preloadCodeLibrary }                                    from '/js/sandbox.js';
+  import { getEmotionState, applyEvent }                           from '/js/emotion.js';
   import { createSession, saveMessage, updateSession }             from '/js/rails_api.js';
+  import { getLogs, clearLogs }                                    from '/js/logger.js';
 
   const canvas      = document.getElementById('bip-face');
   const micBtn      = document.getElementById('mic-btn');
@@ -674,7 +803,13 @@
 
   function getVoiceOptions() {
     const mem = loadMemory();
-    return { voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate) || 1, lang: mem.voiceLang || 'pt-BR' };
+    return {
+      voiceName:          mem.voiceName || '',
+      rate:               parseFloat(mem.voiceRate) || 1,
+      lang:               mem.voiceLang || 'pt-BR',
+      elevenLabsApiKey:   mem.elevenLabsApiKey  || '',
+      elevenLabsVoiceId:  mem.elevenLabsVoiceId || '',
+    };
   }
 
   const emotionColors = {
@@ -706,12 +841,76 @@
     updateDebugPanel();
   }
 
+  // Load state from server (migrates localStorage data on first run)
+  const { codeLibrary: savedLib } = await initMemory();
+  if (savedLib) preloadCodeLibrary(savedLib);
+
   requestAnimationFrame(() => initFace(canvas));
   initRobot(canvas, updateUI);
   updateUI(getRobot());
   const robot = getRobot();
   document.getElementById('robot-name').textContent = robot.name || 'Amic';
   document.title = robot.name || 'Amic';
+
+  // ── Onboarding ────────────────────────────────────────────────────────────────
+  const obOverlay    = document.getElementById('onboarding');
+  const obBubble     = document.getElementById('ob-bubble');
+  const obNameForm   = document.getElementById('ob-name-form');
+  const obNameInput  = document.getElementById('ob-name-input');
+  const obConfirmBtn = document.getElementById('ob-confirm-btn');
+  const obSkipBtn    = document.getElementById('ob-skip');
+
+  async function _obFinish(ownerName) {
+    const mem = loadMemory();
+    if (ownerName) {
+      mem.ownerName = ownerName;
+      // Save as a long-term fact immediately
+      mem.memory.long_term = [
+        { content: `Meu criador se chama ${ownerName}`, importance: 4, last_used: 0 },
+        ...mem.memory.long_term,
+      ].slice(0, 80);
+    }
+    mem.onboardingDone = true;
+    saveMemory(mem);
+    obOverlay.classList.add('hidden');
+    setTimeout(() => obOverlay.classList.add('gone'), 700);
+  }
+
+  if (!loadMemory().onboardingDone) {
+    obOverlay.classList.remove('gone');
+    // Step 1: sleeping → surprised → curious
+    setExpression(canvas, 'SLEEPING', false);
+    obBubble.textContent = 'zzzZZZ...';
+    await new Promise(r => setTimeout(r, 1200));
+    setExpression(canvas, 'SURPRISED', false);
+    obBubble.textContent = '!';
+    await new Promise(r => setTimeout(r, 700));
+    setExpression(canvas, 'CURIOUS', false);
+    // Step 2: ask who made them
+    obBubble.textContent = 'oi... você é quem me fez?';
+    await new Promise(r => setTimeout(r, 1500));
+    obBubble.textContent = 'como você se chama?';
+    obNameForm.classList.add('show');
+    obNameInput.focus();
+
+    const _doConfirm = async () => {
+      const name = obNameInput.value.trim();
+      if (!name) return;
+      obNameForm.classList.remove('show');
+      obBubble.textContent = `que nome bonito, ${name}! vou lembrar de você para sempre.`;
+      setExpression(canvas, 'DELIGHTED', false);
+      await speak(`que nome bonito, ${name}! vou lembrar de você para sempre.`, {
+        ...getVoiceOptions(), emotionKey: 'DELIGHTED',
+      });
+      await new Promise(r => setTimeout(r, 700));
+      obBubble.textContent = 'você pode me ouvir pelo microfone 🎤, me ver pela câmera 📷, e me tocar na tela.';
+      await new Promise(r => setTimeout(r, 3500));
+      await _obFinish(name);
+    };
+    obConfirmBtn.addEventListener('click', _doConfirm);
+    obNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') _doConfirm(); });
+    obSkipBtn.addEventListener('click', () => _obFinish(''));
+  }
 
   // Rails session
   let railsSessionId = sessionStorage.getItem('amic_session_id');
@@ -730,6 +929,8 @@
   let _audioCtx = null;
   function _getAudioCtx() {
     if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // iOS suspends AudioContext until a user gesture — resume on every use
+    if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
     return _audioCtx;
   }
 
@@ -854,51 +1055,73 @@
     const annoyed     = _totalHits > 10;
 
     // Global saturation override
-    if (veryAnnoyed) { playExpression('GRUMPY'); _playTouchSound('grumpy'); return; }
-    if (annoyed && zone !== 'head_top') { playExpression('WORRIED'); _playTouchSound('annoyed'); return; }
+    if (veryAnnoyed) {
+      playExpression('GRUMPY'); _playTouchSound('grumpy');
+      setRobot(applyEvent(getRobot(), 'annoyed_touch'));
+      return;
+    }
+    if (annoyed && zone !== 'head_top') {
+      playExpression('WORRIED'); _playTouchSound('annoyed');
+      setRobot(applyEvent(getRobot(), 'poked'));
+      return;
+    }
 
     switch (zone) {
       case 'head_top':
         // Petting — pleasant until too much
-        if (zc <= 5) { playExpression('HAPPY');     _playTouchSound('purr'); }
-        else         { playExpression('SURPRISED'); _playTouchSound('bonk'); }
+        if (zc <= 5) {
+          playExpression('HAPPY'); _playTouchSound('purr');
+          setRobot(applyEvent(getRobot(), 'petted'));
+        } else {
+          playExpression('SURPRISED'); _playTouchSound('bonk');
+          setRobot(applyEvent(getRobot(), 'poked'));
+        }
         break;
 
       case 'eyes':
         // Always uncomfortable — eyes are sensitive
-        playExpression('SURPRISED');
-        _playTouchSound('blink_ow');
-        triggerShakeFX(0.35);
+        playExpression('SURPRISED'); _playTouchSound('blink_ow'); triggerShakeFX(0.35);
+        setRobot(applyEvent(getRobot(), 'poked'));
         break;
 
       case 'mouth':
         // Uncomfortable — invaded personal space
-        playExpression('CONFUSED');
-        _playTouchSound('mphf');
+        playExpression('CONFUSED'); _playTouchSound('mphf');
+        setRobot(applyEvent(getRobot(), 'poked'));
         break;
 
       case 'cheek':
         // Pleasant in moderation
-        if (zc <= 2)      { playExpression('HAPPY');   _playTouchSound('warm'); }
-        else if (zc <= 4) { playExpression('NEUTRAL');  _playTouchSound('hm'); }
-        else              { playExpression('GRUMPY');   _playTouchSound('annoyed'); }
+        if (zc <= 2) {
+          playExpression('HAPPY'); _playTouchSound('warm');
+          setRobot(applyEvent(getRobot(), 'petted'));
+        } else if (zc <= 4) {
+          playExpression('NEUTRAL'); _playTouchSound('hm');
+        } else {
+          playExpression('GRUMPY'); _playTouchSound('annoyed');
+          setRobot(applyEvent(getRobot(), 'poked'));
+        }
         break;
 
       case 'neck':
         // Ticklish — fun at first, irritating with excess
-        if (zc <= 2)      { playExpression('LAUGHING'); _playTouchSound('tickle'); }
-        else if (zc <= 5) { playExpression('WORRIED');  _playTouchSound('tickle'); }
-        else              { playExpression('GRUMPY');   _playTouchSound('annoyed'); }
+        if (zc <= 2) {
+          playExpression('LAUGHING'); _playTouchSound('tickle');
+          setRobot(applyEvent(getRobot(), 'tickled'));
+        } else if (zc <= 5) {
+          playExpression('WORRIED'); _playTouchSound('tickle');
+        } else {
+          playExpression('GRUMPY'); _playTouchSound('annoyed');
+          setRobot(applyEvent(getRobot(), 'poked'));
+        }
         break;
 
       case 'chest':
-        playExpression(Math.random() < 0.5 ? 'HAPPY' : 'CURIOUS');
-        _playTouchSound('beep');
+        playExpression(Math.random() < 0.5 ? 'HAPPY' : 'CURIOUS'); _playTouchSound('beep');
         break;
 
       case 'face':
-        playExpression('CURIOUS');
-        _playTouchSound('hm');
+        playExpression('CURIOUS'); _playTouchSound('hm');
         break;
     }
   }
@@ -997,8 +1220,7 @@
     if (isSleeping()) { wakeUp(); return; }
     if (listening) return;
     listening = true;
-    const stored = JSON.parse(localStorage.getItem('bip_data') || '{}');
-    if (!stored.apiKey) {
+    if (!loadMemory().apiKey) {
       statusLabel.textContent = 'Configure a chave da API primeiro (⚙)';
       setTimeout(() => (statusLabel.textContent = ''), 3000);
       listening = false;
@@ -1120,9 +1342,9 @@
     transcriptEl.textContent = '';
     responseEl.textContent = `Amic: ${detail.text}`;
     setActivity('speak');
-    const mem = loadMemory();
     await speak(detail.text, {
-      voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate)||1, lang: mem.voiceLang||'pt-BR',
+      ...getVoiceOptions(),
+      emotionKey: detail.expressionKey || '',
       onEnd: () => { setActivity('idle'); responseEl.textContent = ''; },
     });
   });
@@ -1137,9 +1359,9 @@
     transcriptEl.textContent = '';
     responseEl.textContent = `Amic: ${detail.text}`;
     setActivity('speak');
-    const mem = loadMemory();
     await speak(detail.text, {
-      voiceName: mem.voiceName||'', rate: parseFloat(mem.voiceRate)||1, lang: mem.voiceLang||'pt-BR',
+      ...getVoiceOptions(),
+      emotionKey: detail.expressionKey || 'SURPRISED',
       onEnd: () => { setActivity('idle'); responseEl.textContent = ''; },
     });
   });
@@ -1178,6 +1400,20 @@
     setActivity('think');
   });
 
+  const _stageToast      = document.getElementById('stage-toast');
+  const _stageToastEmoji = document.getElementById('stage-toast-emoji');
+  const _stageToastName  = document.getElementById('stage-toast-name');
+  let _stageToastTimer   = null;
+  document.addEventListener('amic:stage-up', ({ detail }) => {
+    const s = detail.stage;
+    _stageToastEmoji.textContent = s.emoji;
+    _stageToastName.textContent  = s.name;
+    _stageToast.classList.add('show');
+    clearTimeout(_stageToastTimer);
+    _stageToastTimer = setTimeout(() => _stageToast.classList.remove('show'), 4500);
+    playExpression('DELIGHTED');
+  });
+
   // ── PTT (hold Space) ──────────────────────────────────────────────────────────
   let pttSession = null;
   document.addEventListener('keydown', async (e) => {
@@ -1185,8 +1421,7 @@
     if (['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)) return;
     e.preventDefault();
     if (isSleeping()) { wakeUp(); return; }
-    const stored = JSON.parse(localStorage.getItem('bip_data') || '{}');
-    if (!stored.apiKey) {
+    if (!loadMemory().apiKey) {
       statusLabel.textContent = 'Configure a chave da API primeiro (⚙)';
       setTimeout(() => (statusLabel.textContent = ''), 3000);
       return;
@@ -1249,6 +1484,9 @@
   function populatePanel() {
     const mem = loadMemory();
     document.getElementById('cfg-api-key').value  = mem.apiKey || '';
+    document.getElementById('cfg-groq-key').value = mem.groqApiKey || '';
+    document.getElementById('cfg-el-key').value   = mem.elevenLabsApiKey  || '';
+    document.getElementById('cfg-el-voice').value = mem.elevenLabsVoiceId || '';
     document.getElementById('cfg-name').value     = mem.name || 'Amic';
     document.getElementById('cfg-rate').value     = mem.voiceRate || 1;
     document.getElementById('cfg-rate-display').textContent = parseFloat(mem.voiceRate||1).toFixed(1)+'×';
@@ -1278,12 +1516,15 @@
   });
   document.getElementById('cfg-save').addEventListener('click', () => {
     const mem = loadMemory();
-    mem.apiKey    = document.getElementById('cfg-api-key').value.trim();
-    mem.name      = document.getElementById('cfg-name').value.trim() || 'Amic';
-    mem.voiceName = document.getElementById('cfg-voice').value;
-    mem.voiceRate = parseFloat(document.getElementById('cfg-rate').value);
-    mem.voiceLang = document.getElementById('cfg-lang').value;
-    mem.showDebug = document.getElementById('cfg-debug').checked;
+    mem.apiKey             = document.getElementById('cfg-api-key').value.trim();
+    mem.groqApiKey         = document.getElementById('cfg-groq-key').value.trim();
+    mem.elevenLabsApiKey   = document.getElementById('cfg-el-key').value.trim();
+    mem.elevenLabsVoiceId  = document.getElementById('cfg-el-voice').value.trim();
+    mem.name               = document.getElementById('cfg-name').value.trim() || 'Amic';
+    mem.voiceName          = document.getElementById('cfg-voice').value;
+    mem.voiceRate          = parseFloat(document.getElementById('cfg-rate').value);
+    mem.voiceLang          = document.getElementById('cfg-lang').value;
+    mem.showDebug          = document.getElementById('cfg-debug').checked;
     saveMemory(mem);
     document.getElementById('robot-name').textContent = mem.name;
     document.title = mem.name;
@@ -1325,9 +1566,11 @@
     const lib   = getCodeLibrary();
     const state = getEmotionState(robot.emotionPoints, robot.stamina ?? 100);
     const skills = robot.skills || {}, weak = robot.weaknesses || {};
+    const stage = getRobotStage();
     document.getElementById('dbg-status').innerHTML = [
       row('Nome', robot.name||'Amic'),
       row('Nascimento', new Date(robot.birthDate).toLocaleDateString('pt-BR')),
+      row('Estágio', `${stage.emoji} ${stage.name} (${stage.key})`),
       row('Estado emocional', `${state.name} (${state.key})`),
       editRow('Emoção', robot.emotionPoints??50, 'dbg-edit-emotion', 0, 100),
       editRow('Stamina', robot.stamina??100, 'dbg-edit-stamina', 0, 100),
@@ -1380,6 +1623,49 @@
       ? history.map(m=>`<div class="dbg-msg"><span class="dbg-role">${m.role==='user'?'Você':'Amic'}</span><div class="dbg-msg-text">${escHtml(m.content)}</div></div>`).join('')
       : '<span class="dbg-empty">Nenhuma conversa ainda.</span>';
   }
+
+  // ── Log panel ─────────────────────────────────────────────────────────────────
+
+  function renderLogs() {
+    const list = document.getElementById('dbg-logs-list');
+    if (!list) return;
+    const entries = getLogs();
+    if (!entries.length) {
+      list.innerHTML = '<span class="dbg-empty">Nenhuma atividade ainda.</span>';
+      return;
+    }
+    list.innerHTML = entries.map(e => {
+      const time = new Date(e.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const badge = `<span class="log-badge log-badge-${e.level}">${e.level}</span>`;
+      const model = e.model ? `<span class="log-model">${escHtml(e.model)}</span>` : '';
+      const detailsStr = e.details
+        ? (typeof e.details === 'string' ? e.details : JSON.stringify(e.details, null, 2))
+        : '';
+      const detailsEl = detailsStr
+        ? `<div class="log-details" title="clique para expandir">${escHtml(detailsStr)}</div>`
+        : '';
+      return `<div class="log-entry" ${detailsStr ? 'onclick="this.classList.toggle(\'expanded\')"' : ''}>
+        <div class="log-meta">
+          <span class="log-time">${time}</span>
+          ${badge}
+          <span class="log-action">${escHtml(e.action)}</span>
+          ${model}
+        </div>
+        ${e.message ? `<div class="log-msg">${escHtml(e.message)}</div>` : ''}
+        ${detailsEl}
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('dbg-logs-clear').addEventListener('click', () => {
+    clearLogs(); renderLogs();
+  });
+
+  document.addEventListener('amic:log', () => {
+    if (document.getElementById('acc-logs')?.classList.contains('open')) renderLogs();
+  });
+
+  document.getElementById('acc-logs').querySelector('.acc-header').addEventListener('click', renderLogs);
 
   document.getElementById('dbg-status').addEventListener('click', (e) => {
     const btn = e.target.closest('.dbg-edit-btn');
@@ -1547,7 +1833,6 @@
     }
 
     _closeVision();
-    setActivity('idle');
 
     const unknown = results.filter(r => !r.match);
     const known   = results.filter(r =>  r.match);
@@ -1556,29 +1841,26 @@
     camFaceCount.style.display = 'flex';
     setTimeout(() => { camFaceCount.style.display = 'none'; }, 6000);
 
-    let visionText = '';
-    if (results.length === 1 && known.length === 1) {
-      const p = known[0].match.profile;
-      visionText = `Olá, ${p.nickname}! Que bom te ver.`;
-    } else if (results.length > 1) {
-      const names = known.map(r => r.match.profile.nickname);
-      visionText = `Vejo ${results.length} pessoas.`;
-      if (names.length) visionText += ` ${names.join(', ')}${names.length > 1 ? ', olá a todos!' : '!'}`;
-    } else if (!unknown.length) {
-      visionText = 'Não reconheço ninguém aqui.';
-    }
+    // Apply mood boost for seeing a known face
+    if (known.length > 0) setRobot(applyEvent(getRobot(), 'face_seen'));
 
-    if (visionText) {
-      responseEl.textContent = `Amic: ${visionText}`;
-      playExpression('HAPPY');
-      const mem = loadMemory();
-      await speak(visionText, {
-        voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate) || 1, lang: mem.voiceLang || 'pt-BR',
-        onEnd: () => { setActivity('idle'); setTimeout(() => { responseEl.textContent = ''; }, 3000); },
-      });
-    }
+    // Build vision context message and let Amic react naturally
+    const visionParts = results.map(r => {
+      if (r.match) return `reconheci ${r.match.profile.nickname}`;
+      const g = r.gender === 'male' ? 'homem' : 'mulher';
+      return `pessoa desconhecida (${g}, aprox. ${r.age} anos)`;
+    });
+    const visionMsg = `[VISAO_CAMERA: ${visionParts.join(', ')}]`;
 
-    // Unknown face(s) — Amic asks via speech, mic intercepts the answer
+    const visionResult = await handleUserMessage(visionMsg, {
+      ...getVoiceOptions(),
+      onChunk: (partial) => { responseEl.textContent = `Amic: ${partial}`; setActivity('speak'); },
+      onEnd:   () => setActivity('idle'),
+    });
+    if (visionResult?.spokenText) responseEl.textContent = `Amic: ${visionResult.spokenText}`;
+    statusLabel.textContent = '';
+
+    // Unknown face(s) — Amic asks for the name, mic intercepts the answer
     if (unknown.length >= 1) {
       _pendingNewFace   = unknown[0];
       _awaitingFaceName = true;
@@ -1587,9 +1869,8 @@
         : `Tem ${unknown.length} pessoas que não conheço. Como se chama a primeira?`;
       responseEl.textContent = `Amic: ${askText}`;
       playExpression('CURIOUS');
-      const mem = loadMemory();
       speak(askText, {
-        voiceName: mem.voiceName || '', rate: parseFloat(mem.voiceRate) || 1, lang: mem.voiceLang || 'pt-BR',
+        ...getVoiceOptions(), emotionKey: 'CURIOUS',
         onEnd: () => { statusLabel.textContent = '🎤 Diga o nome...'; setActivity('listen'); },
       });
     }
@@ -1620,9 +1901,8 @@
         const greeting = `Prazer em te conhecer, ${nickname.trim()}! Vou lembrar de você.`;
         responseEl.textContent = `Amic: ${greeting}`;
         playExpression('DELIGHTED');
-        const mem = loadMemory();
         speak(greeting, {
-          voiceName: mem.voiceName||'', rate: parseFloat(mem.voiceRate)||1, lang: mem.voiceLang||'pt-BR',
+          ...getVoiceOptions(), emotionKey: 'DELIGHTED',
           onEnd: () => { setActivity('idle'); setTimeout(() => { responseEl.textContent = ''; }, 3000); },
         });
       }

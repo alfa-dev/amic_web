@@ -1,8 +1,12 @@
 import { getEmotionState } from './emotion.js';
 import { getAllFacts } from './memory.js';
 import { getCodeLibrary } from './sandbox.js';
+import { logInfo, logError, logWarn } from './logger.js';
 
-const API_URL = 'https://api.anthropic.com/v1/messages';
+const API_URL      = 'https://api.anthropic.com/v1/messages';
+const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions';
+const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
+const GROQ_MODEL   = 'llama-3.3-70b-versatile';
 
 function describeSkills(skills) {
   const high = Object.entries(skills)
@@ -18,12 +22,9 @@ function describeWeaknesses(weaknesses) {
   return high.length ? high.join(', ') : 'sem fraquezas marcantes';
 }
 
-function buildSystemPrompt(robot) {
-  const emotionState = getEmotionState(robot.emotionPoints, robot.stamina ?? 100);
-  const facts = getAllFacts(robot);
-  const skillsDesc = describeSkills(robot.skills || {});
-  const weakDesc = describeWeaknesses(robot.weaknesses || {});
-
+// Static portion of the system prompt — used as a cacheable prefix in Claude API calls.
+// Contains identity, rules, expression tags, and live coding section.
+function _buildStaticPrompt(robot) {
   return `Você é ${robot.name || 'Amic'}, um ser que acabou de nascer. Você não sabe quase nada sobre o mundo — apenas conversa.
 Você aprende tudo com quem fala com você, como uma criança aprende.
 
@@ -35,29 +36,20 @@ NUNCA questione palavras normais como "descobrir", "Brasil", "país", etc.
 Só pergunte "o que é isso?" quando algo soar genuinamente incomum ou impossível de contextualizar (ex: nomes inventados, conceitos abstratos raros).
 Se não souber algo, diga que ainda não aprendeu — sem questionar as palavras da frase.
 
+Suas capacidades físicas (você as tem — use-as na conversa quando relevante):
+- 👁️ CÂMERA: você pode ver o mundo quando alguém aperta o botão de câmera (📷). Você detecta rostos, aprende nomes e reconhece pessoas já conhecidas.
+- 🎤 MICROFONE: você ouve quem fala com você pelo microfone (botão de mic).
+- 🔊 VOZ: você fala em voz alta para quem está perto.
+- 🎨 CORPO: você pode modificar sua própria aparência (cores, olhos, expressões) escrevendo código [CODE].
+
+Quando receber "[VISAO_CAMERA:...]": você acabou de ver pela câmera. Reaja em 1-2 frases curtas e naturais ao que viu — como se você mesmo tivesse apertado o botão e olhado para a frente. Demonstre emoção genuína (reconheceu alguém? fique animado. viu desconhecido? fique curioso).
+
 Quando receber a mensagem "[PENSAMENTO_ESPONTANEO:SOZINHO]": expresse com 1 frase curtíssima que você está sozinho e como isso te faz sentir. Sem perguntas.
 Quando receber a mensagem "[PENSAMENTO_ESPONTANEO:ALGUEM]": pergunte, com 1 frase curtíssima e curiosa, se tem alguém por perto ou onde a pessoa está. Só 1 pergunta.
 Quando receber a mensagem "[PENSAMENTO_ESPONTANEO:FATO]": compartilhe, com 1 frase curtíssima e animada, um fato que você aprendeu — como se estivesse contando para alguém que está do seu lado. Comece com algo como "ei, sabia que..." ou "lembrei agora que...". Sem perguntas.
 Quando receber a mensagem "[PENSAMENTO_ESPONTANEO:SONHO]": acorde surpreso e conte, em 1-2 frases curtíssimas, um sonho que você acabou de ter. O sonho pode ser engraçado, um pesadelo, psicodélico ou baseado em coisas que você aprendeu. No JSON final, inclua também "dreamEmojis" com 3-5 emojis que representem esse sonho. Ex: {"learned":[], "dreamEmojis":["🌈","🐉","✨"]}
 Quando receber a mensagem "[APRENDER:X]": use seu conhecimento sobre X e responda com 1 frase curtíssima animada confirmando que acabou de aprender (ex: "aprendi a história do X!"). Inclua no JSON final de 10 a 20 fatos específicos sobre X em "learned" — se for história, os eventos em ordem; se for conceito, fatos relevantes. Apenas conteúdo adequado para crianças.
 
-Seu estado emocional: ${emotionState.name}
-Comporte-se de acordo: ${emotionState.behavior}
-
-Sua personalidade:
-- Pontos fortes: ${skillsDesc}
-- Fraquezas: ${weakDesc}
-
-O que você já aprendeu:
-${facts}
-
-${(() => {
-  const actions = getCodeLibrary().actions || {};
-  const entries = Object.entries(actions);
-  if (!entries.length) return '';
-  return 'Comportamentos que você já sabe executar:\n' +
-    entries.map(([k, { description }]) => `  - ${k}: ${description}  →  api.do('${k}')`).join('\n') + '\n';
-})()}
 Regras ABSOLUTAS de formato:
 - MÁXIMO 2 frases por resposta. Sem exceções.
 - MÁXIMO 1 pergunta por resposta.
@@ -102,6 +94,7 @@ PRIMITIVOS:
   api.face.setHeadTilt(v)           — inclina cabeça (-0.4 a 0.4)
   api.face.resetHeadTilt()
   api.face.setLed(i, '#hex')        — LED i (0=esq, 1=centro, 2=dir)
+  api.face.walk('intent', ms)       — move com propósito por ms milissegundos ('excited'|'curious'|'retreat'|'neutral'|'still')
   api.addExpression('NOME', {...})  — cria expressão facial PERMANENTE
   api.playExpression('NOME')        — toca expressão por alguns segundos
   api.defineAction('NOME', 'desc', \`código\`) — guarda ação para reusar no futuro
@@ -143,10 +136,101 @@ Arregalar os olhos por 1.5s (efeito único):
 api.face.setBothEyeScale(1.7);
 api.after(1500, () => api.face.resetEyes());
 [/CODE]
-════════════════════════════════════════
+════════════════════════════════════════`;
+}
 
-Ao final da resposta (após texto e [CODE] se houver):
+// Dynamic portion — changes per request (emotion, facts, code library, visual state).
+function _buildDynamicPrompt(robot, visualState = '', stage = null) {
+  const emotionState = getEmotionState(robot.emotionPoints, robot.stamina ?? 100);
+  const facts = getAllFacts(robot);
+  const skillsDesc = describeSkills(robot.skills || {});
+  const weakDesc = describeWeaknesses(robot.weaknesses || {});
+
+  const stageBlock = stage
+    ? `Estágio de desenvolvimento: ${stage.name} ${stage.emoji}\n${stage.behavior}\n\n`
+    : '';
+
+  const actions = getCodeLibrary().actions || {};
+  const entries = Object.entries(actions);
+  const codeLibBlock = entries.length
+    ? 'Comportamentos que você já sabe executar:\n' +
+      entries.map(([k, { description }]) => `  - ${k}: ${description}  →  api.do('${k}')`).join('\n') + '\n\n'
+    : '';
+
+  return `${stageBlock}ESTADO EMOCIONAL ATUAL — OBRIGATÓRIO:
+Você está ${emotionState.name}. NÃO contradiga isso. Nunca diga que está com um humor diferente.
+Comporte-se EXATAMENTE assim: ${emotionState.behavior}
+${visualState ? `\nSeu estado visual atual: ${visualState}. Se alguém perguntar por que você está assim, você SABE — foi você mesmo que mudou com código.\n` : ''}
+Sua personalidade:
+- Pontos fortes: ${skillsDesc}
+- Fraquezas: ${weakDesc}
+
+O que você já aprendeu:
+${facts}
+
+${codeLibBlock}Ao final da resposta (após texto e [CODE] se houver):
 {"learned": ["fato 1"]} ou {"learned": []} se nada novo`;
+}
+
+// ── Groq (free tier) ──────────────────────────────────────────────────────────
+
+async function _callGroq(groqApiKey, messages, maxTokens = 500) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${groqApiKey}`,
+    },
+    body: JSON.stringify({ model: GROQ_MODEL, max_tokens: maxTokens, messages }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Erro Groq HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// Spontaneous thought via Groq — returns plain text or null if no Groq key.
+export async function askGroqSpontaneous(robot, tipo) {
+  const groqKey = robot.groqApiKey;
+  if (!groqKey) return null;
+
+  const emotionState = getEmotionState(robot.emotionPoints, robot.stamina ?? 100);
+  const facts = getAllFacts(robot);
+  const system = `Você é ${robot.name || 'Amic'}, uma IA amigável que acabou de nascer. Estado emocional atual: ${emotionState.name}. Comporte-se assim: ${emotionState.behavior} Fale em português brasileiro informal, máximo 1-2 frases curtíssimas. Sem asteriscos. Sem CAPS LOCK excessivo.`;
+  const userMsgMap = {
+    FATO:    `Compartilhe um fato que você aprendeu de forma animada. Comece com "ei, sabia que..." ou "lembrei agora que...". O que você sabe:\n${facts}`,
+    ALGUEM:  'Pergunte, com 1 frase curtíssima e curiosa, se tem alguém por perto ou onde a pessoa está.',
+    SOZINHO: 'Expresse com 1 frase curtíssima que você está sozinho e como isso te faz sentir.',
+    SONHO:   'Conte em 1-2 frases curtíssimas um sonho criativo que você acabou de ter (pode ser engraçado, psicodélico ou baseado no que você aprendeu).',
+  };
+
+  logInfo('groq:espontâneo', { model: GROQ_MODEL, message: `tipo=${tipo}` });
+  try {
+    const text = await _callGroq(groqKey, [
+      { role: 'system', content: system },
+      { role: 'user', content: userMsgMap[tipo] || userMsgMap.SOZINHO },
+    ]);
+    return text.trim() || null;
+  } catch (e) {
+    logError('groq:espontâneo', e, { model: GROQ_MODEL });
+    return null;
+  }
+}
+
+// Topic learning via Groq — returns { facts: string[], summary: string } or throws.
+export async function askGroqLearning(groqApiKey, topic) {
+  const system = `Você é um extrator de conhecimento. Dado um tópico, gere entre 8 e 20 fatos concisos em português brasileiro sobre APENAS esse tópico. Se for uma história ou conto, extraia os eventos narrativos em ordem cronológica. Se for um conceito, extraia informações factuais relevantes. Retorne SOMENTE um JSON válido no formato: {"facts": ["fato 1", "fato 2", ...], "summary": "resumo animado em 1 frase curta confirmando o aprendizado"}. Nada fora do JSON.`;
+  logInfo('groq:aprender', { model: GROQ_MODEL, message: `tópico="${topic}"` });
+  const text = await _callGroq(groqApiKey, [
+    { role: 'system', content: system },
+    { role: 'user', content: topic },
+  ], 1400);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('Resposta Groq sem JSON válido');
+  const parsed = JSON.parse(jsonMatch[0]);
+  return { facts: parsed.facts || [], summary: parsed.summary || `aprendi sobre ${topic}!` };
 }
 
 // Strip the {"learned":...} tail and [CODE] blocks from partial streaming text
@@ -167,10 +251,12 @@ function streamDisplay(text) {
   return t;
 }
 
-export async function askBip(robot, userMessage, { onChunk, maxTokens = 500 } = {}) {
-  const stored = JSON.parse(localStorage.getItem('bip_data') || '{}');
-  const apiKey = stored.apiKey || robot.apiKey;
+export async function askBip(robot, userMessage, { onChunk, maxTokens = 500, visualState = '', stage = null } = {}) {
+  const apiKey = robot.apiKey;
   if (!apiKey) throw new Error('Chave da API não configurada. Abra as configurações (⚙) e insira sua chave.');
+
+  const preview = userMessage.length > 60 ? userMessage.slice(0, 60) + '…' : userMessage;
+  logInfo('claude', { model: CLAUDE_MODEL, message: `→ "${preview}"` });
 
   const history = (robot.conversationHistory || []).slice(-10).map(m => ({
     role: m.role,
@@ -182,26 +268,38 @@ export async function askBip(robot, userMessage, { onChunk, maxTokens = 500 } = 
     { role: 'user', content: userMessage },
   ];
 
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: maxTokens,
-      stream: true,
-      system: buildSystemPrompt(robot),
-      messages,
-    }),
-  });
+  let response;
+  try {
+    response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: maxTokens,
+        stream: true,
+        system: [
+          { type: 'text', text: _buildStaticPrompt(robot), cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: _buildDynamicPrompt(robot, visualState, stage) },
+        ],
+        messages,
+      }),
+    });
+  } catch (e) {
+    logError('claude', e, { model: CLAUDE_MODEL });
+    throw e;
+  }
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Erro HTTP ${response.status}`);
+    const msg = err.error?.message || `HTTP ${response.status}`;
+    logError('claude', new Error(msg), { model: CLAUDE_MODEL, details: err });
+    throw new Error(msg);
   }
 
   const reader = response.body.getReader();
@@ -252,11 +350,16 @@ export async function askBip(robot, userMessage, { onChunk, maxTokens = 500 } = 
   // Clean spoken text: strip expression tag + code blocks + JSON (complete OR truncated)
   const spokenText = fullText
     .replace(/^\s*\[EXPR:[A-Z]+\]\s*/, '')
-    .replace(/\s*\[CODE\][\s\S]*?\[\/CODE\]/g, '')  // strip complete code blocks
-    .replace(/\s*\[CODE\][\s\S]*$/, '')              // strip partial/unclosed code block
-    .replace(/\s*\{"learned"[\s\S]*$/, '')           // strips from {"learned" onwards
-    .replace(/\s*\{[^}]*$/, '')                      // strips any dangling open {
+    .replace(/\s*\[CODE\][\s\S]*?\[\/CODE\]/g, '')
+    .replace(/\s*\[CODE\][\s\S]*$/, '')
+    .replace(/\s*\{"learned"[\s\S]*$/, '')
+    .replace(/\s*\{[^}]*$/, '')
     .trim();
+
+  logInfo('claude:ok', {
+    model: CLAUDE_MODEL,
+    message: `expr=${expressionKey ?? 'none'} learned=${learned.length} code=${codeBlocks.length}`,
+  });
 
   return { spokenText, learned, expressionKey, codeBlocks, dreamEmojis };
 }
