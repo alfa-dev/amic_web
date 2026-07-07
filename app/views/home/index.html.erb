@@ -131,6 +131,23 @@
   #transcript { font-size: 0.65rem; color: var(--text-muted); min-height: 1em; }
   #response   { font-size: 0.75rem; color: var(--text); margin-top: 3px; min-height: 1em; line-height: 1.5; }
 
+  #text-input {
+    pointer-events: auto;
+    background: rgba(22, 22, 26, 0.70);
+    backdrop-filter: blur(6px);
+    border: 1px solid #333344;
+    border-radius: 10px;
+    padding: 8px 11px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #text-input::placeholder { color: var(--text-muted); }
+  #text-input:focus { border-color: var(--accent); }
+  #text-input:disabled { opacity: 0.5; }
+
   /* Mic button — right of bottom bar */
   #mic-btn {
     flex-shrink: 0;
@@ -598,6 +615,7 @@
       <div id="transcript"></div>
       <div id="response"></div>
     </div>
+    <input id="text-input" type="text" placeholder="Ou digite uma mensagem..." autocomplete="off" />
   </div>
 
   <button id="cam-btn" title="Amic ver">
@@ -715,6 +733,25 @@
     <span class="panel-hint">Usada para pensamentos espontâneos e aprendizado — tier gratuito disponível em <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a>.</span>
   </div>
   <div class="panel-section">
+    <div class="panel-row">
+      <div>
+        <div class="panel-label">Voz local (Piper TTS)</div>
+        <div class="panel-hint" style="margin-top:2px">Narração offline e grátis, roda no servidor. Tem prioridade sobre o ElevenLabs quando ativada.</div>
+      </div>
+      <label class="toggle">
+        <input id="cfg-piper" type="checkbox" />
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+    <label class="panel-label" for="cfg-piper-voice" style="margin-top:12px">Voz do Piper</label>
+    <select id="cfg-piper-voice" class="panel-select">
+      <option value="pt_BR-faber-medium">Faber (padrão)</option>
+      <option value="pt_BR-cadu-medium">Cadu</option>
+      <option value="pt_BR-jeff-medium">Jeff</option>
+      <option value="pt_BR-edresson-low">Edresson</option>
+    </select>
+  </div>
+  <div class="panel-section">
     <label class="panel-label" for="cfg-el-key">ElevenLabs — Chave da API</label>
     <input id="cfg-el-key" type="password" class="panel-input" placeholder="sk_..." autocomplete="off" />
     <span class="panel-hint">Voz expressiva. Deixe vazio para usar a voz do sistema.</span>
@@ -727,6 +764,10 @@
   <div class="panel-section">
     <label class="panel-label" for="cfg-name">Nome do robô</label>
     <input id="cfg-name" type="text" class="panel-input" placeholder="Amic" />
+  </div>
+  <div class="panel-section">
+    <label class="panel-label" for="cfg-skin">Aparência (skin)</label>
+    <select id="cfg-skin" class="panel-select"></select>
   </div>
   <div class="panel-section">
     <label class="panel-label" for="cfg-voice">Voz</label>
@@ -777,7 +818,8 @@
 
 <script type="module">
   import { initFace, setExpression, setActivity, playExpression,
-           setDeviceOrientation, triggerShakeFX, getTouchZone }   from '/js/face.js';
+           setDeviceOrientation, triggerShakeFX, getTouchZone,
+           setSkin, listSkins }                                   from '/js/face.js';
   import { analyzeFrame, findBestMatch }                          from '/js/vision.js';
   import { initRobot, handleUserMessage, getRobot, setRobot,
            getCodeLibrary, resetCodeLibrary, isSleeping, wakeUp,
@@ -796,6 +838,7 @@
   const pointsLabel = document.getElementById('points-label');
   const transcriptEl= document.getElementById('transcript');
   const responseEl  = document.getElementById('response');
+  const textInput   = document.getElementById('text-input');
   const debugBtn    = document.getElementById('debug-btn');
   const debugPanel  = document.getElementById('debug-panel');
   const debugClose  = document.getElementById('debug-close');
@@ -809,6 +852,8 @@
       lang:               mem.voiceLang || 'pt-BR',
       elevenLabsApiKey:   mem.elevenLabsApiKey  || '',
       elevenLabsVoiceId:  mem.elevenLabsVoiceId || '',
+      usePiperTts:        !!mem.usePiperTts,
+      piperVoice:         mem.piperVoice || 'pt_BR-faber-medium',
     };
   }
 
@@ -845,7 +890,7 @@
   const { codeLibrary: savedLib } = await initMemory();
   if (savedLib) preloadCodeLibrary(savedLib);
 
-  requestAnimationFrame(() => initFace(canvas));
+  requestAnimationFrame(() => initFace(canvas, loadMemory().skinId || 'classic'));
   initRobot(canvas, updateUI);
   updateUI(getRobot());
   const robot = getRobot();
@@ -1276,6 +1321,55 @@
     listening = false;
   });
 
+  // ── Text input (fallback when voice recognition isn't available) ──────────────
+  textInput.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return;
+    const text = textInput.value.trim();
+    if (!text || listening) return;
+    if (isSleeping()) { wakeUp(); return; }
+    if (!loadMemory().apiKey) {
+      statusLabel.textContent = 'Configure a chave da API primeiro (⚙)';
+      setTimeout(() => (statusLabel.textContent = ''), 3000);
+      return;
+    }
+    listening = true;
+    textInput.value = '';
+    textInput.disabled = true;
+    transcriptEl.textContent = `Você: ${text}`;
+    responseEl.textContent = '';
+
+    if (_awaitingFaceName) {
+      textInput.disabled = false;
+      listening = false;
+      await _saveNewFace(text);
+      return;
+    }
+
+    statusLabel.textContent = 'Pensando...';
+    setActivity('think');
+    const r = getRobot();
+    if (railsSessionId) saveMessage(railsSessionId, 'user', text, r.emotionPoints, r.stamina ?? 100).catch(() => {});
+    const result = await handleUserMessage(text, {
+      ...getVoiceOptions(),
+      onChunk: (partial) => { responseEl.textContent = `Amic: ${partial}`; setActivity('speak'); },
+      onEnd: () => setActivity('idle'),
+    });
+    if (result?.spokenText) {
+      responseEl.textContent = `Amic: ${result.spokenText}`;
+      if (railsSessionId) {
+        const r2 = getRobot();
+        saveMessage(railsSessionId, 'assistant', result.spokenText, r2.emotionPoints, r2.stamina ?? 100).catch(() => {});
+      }
+    } else if (result?.error) {
+      responseEl.textContent = result.error;
+      setActivity('idle');
+    }
+    statusLabel.textContent = '';
+    textInput.disabled = false;
+    textInput.focus();
+    listening = false;
+  });
+
   // ── Sleep effects ─────────────────────────────────────────────────────────────
   let _sleepFxTimer = null;
   const SLEEP_EMOJIS = ['💤', '⭐', '🌙', '💭', '✨', '🌟', '☁️', '🌠'];
@@ -1487,7 +1581,19 @@
     document.getElementById('cfg-groq-key').value = mem.groqApiKey || '';
     document.getElementById('cfg-el-key').value   = mem.elevenLabsApiKey  || '';
     document.getElementById('cfg-el-voice').value = mem.elevenLabsVoiceId || '';
+    document.getElementById('cfg-piper').checked  = mem.usePiperTts || false;
+    document.getElementById('cfg-piper-voice').value = mem.piperVoice || 'pt_BR-faber-medium';
     document.getElementById('cfg-name').value     = mem.name || 'Amic';
+    const skinSelect = document.getElementById('cfg-skin');
+    if (!skinSelect.options.length) {
+      for (const s of listSkins()) {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        skinSelect.appendChild(opt);
+      }
+    }
+    skinSelect.value = mem.skinId || 'classic';
     document.getElementById('cfg-rate').value     = mem.voiceRate || 1;
     document.getElementById('cfg-rate-display').textContent = parseFloat(mem.voiceRate||1).toFixed(1)+'×';
     document.getElementById('cfg-debug').checked  = mem.showDebug || false;
@@ -1520,7 +1626,17 @@
     mem.groqApiKey         = document.getElementById('cfg-groq-key').value.trim();
     mem.elevenLabsApiKey   = document.getElementById('cfg-el-key').value.trim();
     mem.elevenLabsVoiceId  = document.getElementById('cfg-el-voice').value.trim();
+    mem.usePiperTts        = document.getElementById('cfg-piper').checked;
+    mem.piperVoice         = document.getElementById('cfg-piper-voice').value;
     mem.name               = document.getElementById('cfg-name').value.trim() || 'Amic';
+    const newSkinId        = document.getElementById('cfg-skin').value;
+    if (newSkinId !== mem.skinId) {
+      statusLabel.textContent = 'Carregando skin...';
+      setSkin(newSkinId)
+        .then(() => { statusLabel.textContent = ''; })
+        .catch(() => { statusLabel.textContent = 'Não consegui carregar essa skin.'; setTimeout(() => (statusLabel.textContent = ''), 3000); });
+    }
+    mem.skinId             = newSkinId;
     mem.voiceName          = document.getElementById('cfg-voice').value;
     mem.voiceRate          = parseFloat(document.getElementById('cfg-rate').value);
     mem.voiceLang          = document.getElementById('cfg-lang').value;

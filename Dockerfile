@@ -20,6 +20,14 @@ RUN apt-get update -qq && \
     ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
+# Piper TTS: local, offline, free voice synthesis (pt-BR) — binary + voice model
+COPY bin/download_piper ./bin/download_piper
+RUN ./bin/download_piper vendor/piper
+
+# Alternate 3D skins: free, permissively-licensed .glb models
+COPY bin/download_skins ./bin/download_skins
+RUN ./bin/download_skins public/models/skins
+
 # Set production environment variables and enable jemalloc for reduced memory usage and latency.
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \

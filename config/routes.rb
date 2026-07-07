@@ -24,6 +24,7 @@ Rails.application.routes.draw do
       resources :messages, only: [:create]
     end
     resources :face_profiles, only: [:index, :create, :update, :destroy]
+    post "tts/piper", to: "tts#piper"
   end
 
   get "up" => "rails/health#show", as: :rails_health_check

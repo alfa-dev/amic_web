@@ -33,3 +33,9 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
+# Piper TTS binary + voice models (downloaded via bin/download_piper, or during Docker build)
+/vendor/piper
+
+# 3D skin models (downloaded via bin/download_skins, or during Docker build)
+/public/models/skins
+

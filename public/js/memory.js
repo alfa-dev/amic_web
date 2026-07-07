@@ -31,6 +31,9 @@ const DEFAULT_STATE = {
   voiceLang: 'pt-BR',
   elevenLabsApiKey: '',
   elevenLabsVoiceId: '',
+  usePiperTts: false,
+  piperVoice: 'pt_BR-faber-medium',
+  skinId: 'classic',
   showDebug: false,
 };
 
@@ -148,6 +151,9 @@ export function resetMemory() {
     voiceLang:         current.voiceLang,
     elevenLabsApiKey:  current.elevenLabsApiKey,
     elevenLabsVoiceId: current.elevenLabsVoiceId,
+    usePiperTts:       current.usePiperTts,
+    piperVoice:        current.piperVoice,
+    skinId:            current.skinId,
     showDebug:         current.showDebug,
   };
   _cache = fresh;

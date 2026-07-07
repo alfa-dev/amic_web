@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Downloads the Piper TTS binary + Brazilian Portuguese voice models for
+# local, offline, free narration (no ElevenLabs/API key required).
+# Run once from the project root: bin/download_piper
+set -e
+
+DEST="${1:-vendor/piper}"
+PIPER_VERSION="2023.11.14-2"
+HF_BASE="https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR"
+
+# name:subdir (voice file is pt_BR-<name>-<quality>)
+VOICES=(
+  "faber:faber/medium:medium"
+  "cadu:cadu/medium:medium"
+  "jeff:jeff/medium:medium"
+  "edresson:edresson/low:low"
+)
+
+mkdir -p "$(dirname "$DEST")" "$DEST/voices"
+
+if [ ! -x "$DEST/piper" ]; then
+  echo "→ Baixando binário do Piper TTS ($PIPER_VERSION)..."
+  curl -fsSL "https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz" \
+    -o /tmp/piper.tar.gz
+  tar -xzf /tmp/piper.tar.gz -C "$(dirname "$DEST")"
+  rm /tmp/piper.tar.gz
+fi
+
+for entry in "${VOICES[@]}"; do
+  name="${entry%%:*}"
+  rest="${entry#*:}"
+  subdir="${rest%%:*}"
+  quality="${rest##*:}"
+  voice="pt_BR-${name}-${quality}"
+
+  if [ ! -f "$DEST/voices/${voice}.onnx" ]; then
+    echo "→ Baixando voz $voice..."
+    curl -fsSL "$HF_BASE/$subdir/${voice}.onnx"      -o "$DEST/voices/${voice}.onnx"
+    curl -fsSL "$HF_BASE/$subdir/${voice}.onnx.json" -o "$DEST/voices/${voice}.onnx.json"
+  fi
+done
+
+echo ""
+echo "✓ Piper TTS pronto em $DEST"

@@ -126,6 +126,7 @@ Definidos em `robot.js:STAGES`:
 | Anthropic Claude Haiku | Conversa principal | Pago (~$0.25/M tokens) | `state.apiKey` |
 | Groq / llama-3.3-70b-versatile | Pensamentos espontâneos + aprendizado | **Grátis** (14.400 req/dia) | `state.groqApiKey` |
 | ElevenLabs TTS | Voz expressiva | Opcional/Pago | `state.elevenLabsApiKey` |
+| Piper TTS (local) | Narração offline pt-BR, sem custo | **Grátis** (roda no servidor) | — |
 | Open-Meteo | Clima | **Grátis** | — |
 | Web Speech API | STT + TTS fallback | **Grátis** (browser) | — |
 | face-api.js | Detecção facial | **Grátis** (local) | — |
@@ -133,6 +134,17 @@ Definidos em `robot.js:STAGES`:
 ---
 
 ## Changelog
+
+### 2026-07-07 — Voz Local Grátis (Piper TTS)
+
+- **Novo:** [Piper TTS](https://github.com/rhasspy/piper) integrado como narração local, offline e gratuita em pt-BR (voz `pt_BR-faber-medium`), alternativa ao ElevenLabs sem custo por caractere
+  - `bin/download_piper` — baixa binário + modelo de voz para `vendor/piper/` (gitignorado; baixado também durante o build da imagem Docker)
+  - `app/services/piper_tts_service.rb` — roda o binário via `Open3`, retorna WAV
+  - `app/controllers/api/tts_controller.rb` — `POST /api/tts/piper { text }` → áudio `audio/wav`
+- **Modificado:** `voice.js` — nova `_speakPiper`; `speak()` agora prioriza Piper (se `usePiperTts` ativo) → ElevenLabs → TTS do sistema, com fallback em cascata
+- **Modificado:** `memory.js` — campo `usePiperTts` no estado padrão, preservado no `resetMemory`
+- **Modificado:** `app/views/home/index.html.erb` — toggle "Voz local (Piper TTS)" no painel de configurações
+- **Modificado:** `Dockerfile` — baixa Piper (binário + voz) durante o build, para produção já sair com narração local pronta
 
 ### 2026-04-27 — Log de Atividade e Melhoria de Erros
 

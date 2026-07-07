@@ -177,6 +177,55 @@ async function _speakElevenLabs(text, { apiKey, voiceId, emotionKey, rate = 1, o
   });
 }
 
+// ── Piper TTS (local, offline, free) ──────────────────────────────────────────
+
+async function _speakPiper(text, { rate = 1, voice = '', onStart, onEnd } = {}) {
+  logInfo('piper', { message: `"${text.slice(0, 50)}…" voice=${voice || 'pt_BR-faber-medium'}` });
+
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+
+  const res = await fetch('/api/tts/piper', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+    },
+    body: JSON.stringify({ text, voice }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const error = new Error(err?.error || `HTTP ${res.status}`);
+    logError('piper', error);
+    throw error;
+  }
+
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.playbackRate = Math.max(0.5, Math.min(2.0, rate));
+  currentAudio = audio;
+
+  return new Promise((resolve) => {
+    audio.onplay  = () => onStart?.();
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      onEnd?.();
+      resolve();
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      resolve();
+    };
+    audio.play().catch(() => resolve());
+  });
+}
+
 // ── System TTS (fallback) ─────────────────────────────────────────────────────
 
 function _speakSystem(text, { voiceName = '', rate = 1, lang = 'pt-BR', onStart, onEnd } = {}) {
@@ -210,6 +259,7 @@ function _speakSystem(text, { voiceName = '', rate = 1, lang = 'pt-BR', onStart,
 export function speak(text, {
   voiceName = '', rate = 1, lang = 'pt-BR',
   elevenLabsApiKey = '', elevenLabsVoiceId = '',
+  usePiperTts = false, piperVoice = '',
   emotionKey = '',
   onStart, onEnd,
 } = {}) {
@@ -217,21 +267,31 @@ export function speak(text, {
   const clean = text.replace(/\{[\s\S]*"learned"[\s\S]*\}/, '').trim();
   if (!clean) { onEnd?.(); return Promise.resolve(); }
 
-  if (elevenLabsApiKey) {
-    return _speakElevenLabs(clean, {
-      apiKey:   elevenLabsApiKey,
-      voiceId:  elevenLabsVoiceId || EL_DEFAULT_VOICE,
-      emotionKey,
-      rate,
-      onStart,
-      onEnd,
-    }).catch((e) => {
-      logWarn('elevenlabs:fallback', 'ElevenLabs falhou — usando TTS do sistema', { details: e?.message });
-      return _speakSystem(clean, { voiceName, rate, lang, onStart, onEnd });
+  const speakElevenOrSystem = () => {
+    if (elevenLabsApiKey) {
+      return _speakElevenLabs(clean, {
+        apiKey:   elevenLabsApiKey,
+        voiceId:  elevenLabsVoiceId || EL_DEFAULT_VOICE,
+        emotionKey,
+        rate,
+        onStart,
+        onEnd,
+      }).catch((e) => {
+        logWarn('elevenlabs:fallback', 'ElevenLabs falhou — usando TTS do sistema', { details: e?.message });
+        return _speakSystem(clean, { voiceName, rate, lang, onStart, onEnd });
+      });
+    }
+    return _speakSystem(clean, { voiceName, rate, lang, onStart, onEnd });
+  };
+
+  if (usePiperTts) {
+    return _speakPiper(clean, { rate, voice: piperVoice, onStart, onEnd }).catch((e) => {
+      logWarn('piper:fallback', 'Piper falhou — usando próxima opção de voz', { details: e?.message });
+      return speakElevenOrSystem();
     });
   }
 
-  return _speakSystem(clean, { voiceName, rate, lang, onStart, onEnd });
+  return speakElevenOrSystem();
 }
 
 export function getAvailableVoices() {

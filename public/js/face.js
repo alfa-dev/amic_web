@@ -1,14 +1,9 @@
-// Three.js 3D face for Amic — capsule head + body, capsule eyes, natural movement
+// Three.js 3D face for Amic — natural movement/expression engine, geometry
+// comes from a pluggable "skin" (see skins/index.js).
 import * as THREE from '/js/three.module.min.js';
+import { getSkin, listSkins } from './skins/index.js';
 
-const C = {
-  head:     0xf2f6ff,
-  headEmit: 0x505e88,
-  eye:      0x080810,
-  eyeShine: 0xffffff,
-  brow:     0x1a1a30,
-  mouth:    0x2a2a44,
-};
+export { listSkins };
 
 // ── Expressions ───────────────────────────────────────────────────────────────
 const EXPR = {
@@ -43,7 +38,10 @@ export function registerExpression(name, params) {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let scene, camera, renderer, amicRoot, faceGroup, bodyGroup;
-let leftEye, rightEye, leftBrow, rightBrow, mouthMesh;
+let leftEye, rightEye, leftBrow, rightBrow;
+let ledMeshes = [];
+let skinRebuildMouth = null;
+let currentSkin = null, currentSkinId = null;
 let blinkYL = 1, blinkYR = 1;
 let talkTimer = null;
 let isTalking = false, talkPhase = false;
@@ -53,8 +51,6 @@ let _overrides = {};
 let _headColorOverride = null;
 let _bodyColorOverride = null;
 
-const LED_COUNT = 3;
-const ledMeshes = [];
 let ledActivity = 'idle';
 let ledPulseT   = 0;
 const LED_PAL = {
@@ -226,7 +222,7 @@ function _tickWalk(t, dt) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-export function initFace(canvasEl) {
+export function initFace(canvasEl, skinId = 'classic') {
   const W = window.innerWidth  || 320;
   const H = window.innerHeight || 320;
 
@@ -258,7 +254,7 @@ export function initFace(canvasEl) {
   bodyGroup.position.y = -0.88;
   amicRoot.add(bodyGroup);
 
-  buildFace();
+  setSkin(skinId);
   scheduleNextBlink();
 
   document.addEventListener('mousemove', e => {
@@ -277,73 +273,64 @@ export function initFace(canvasEl) {
   (function loop() { requestAnimationFrame(loop); tick(); })();
 }
 
-// ── Build face ────────────────────────────────────────────────────────────────
-function buildFace() {
-  faceGroup.position.y = 0.52;
+// ── Skins ─────────────────────────────────────────────────────────────────────
+// Disposes the currently mounted skin's meshes/materials (if any), builds the
+// requested skin's geometry, and rewires the module-level references that
+// tick() animates. tick()/EXPR/blink/talk/LEDs never change between skins —
+// only the geometry/materials a skin builds do.
+let _skinLoadToken = 0;
+export async function setSkin(skinId) {
+  if (!faceGroup || !bodyGroup) return;
+  const token = ++_skinLoadToken; // guards against overlapping switches racing each other
 
-  headMat = new THREE.MeshStandardMaterial({ color:C.head, emissive:C.headEmit, roughness:0.55 });
-  faceGroup.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.72, 0.50, 16, 32), headMat));
+  for (const group of [faceGroup, bodyGroup]) {
+    for (const child of [...group.children]) {
+      group.remove(child);
+      if (child.userData?.sharedGltfAsset) continue; // cached model, reused across skin switches
+      child.traverse?.(o => {
+        o.geometry?.dispose?.();
+        if (Array.isArray(o.material)) o.material.forEach(m => m.dispose?.());
+        else o.material?.dispose?.();
+      });
+    }
+  }
+  leftEye = rightEye = leftBrow = rightBrow = undefined;
+  ledMeshes = [];
 
-  bodyMat = new THREE.MeshStandardMaterial({ color:C.head, emissive:C.headEmit, roughness:0.55 });
-  bodyGroup.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.44, 0.28, 8, 24), bodyMat));
+  currentSkin   = getSkin(skinId);
+  currentSkinId = currentSkin.id;
 
-  const ledGeo = new THREE.SphereGeometry(0.052, 8, 8);
-  const ledXPositions = [-0.19, 0, 0.19];
-  for (let i = 0; i < LED_COUNT; i++) {
-    const ledMat = new THREE.MeshStandardMaterial({
-      color: LED_PAL.idle[i], emissive: LED_PAL.idle[i],
-      emissiveIntensity: 0.2, roughness: 0.3,
-    });
-    const mesh = new THREE.Mesh(ledGeo, ledMat);
-    mesh.position.set(ledXPositions[i], 0.09, 0.40);
-    bodyGroup.add(mesh);
-    ledMeshes.push(mesh);
+  const parts = await currentSkin.build(faceGroup, bodyGroup);
+  if (token !== _skinLoadToken) return; // a newer setSkin() call superseded this one
+
+  headMat        = parts.headMat;
+  bodyMat        = parts.bodyMat;
+  leftEye        = parts.leftEye;
+  rightEye       = parts.rightEye;
+  leftBrow       = parts.leftBrow;
+  rightBrow      = parts.rightBrow;
+  ledMeshes      = parts.ledMeshes;
+  skinRebuildMouth = parts.rebuildMouth;
+
+  // Re-apply any active color overrides from sandbox code so switching
+  // skins doesn't silently drop a customization the AI made.
+  if (_headColorOverride) {
+    const c = new THREE.Color(_headColorOverride);
+    headMat?.color.set(c);
+    headMat?.emissive.set(c.clone().multiplyScalar(0.18));
+  }
+  if (_bodyColorOverride) {
+    const c = new THREE.Color(_bodyColorOverride);
+    bodyMat?.color.set(c);
+    bodyMat?.emissive.set(c.clone().multiplyScalar(0.18));
   }
 
-  const eyeMat = new THREE.MeshStandardMaterial({ color:C.eye, roughness:0.92 });
-  const eyeGeo = new THREE.CapsuleGeometry(0.15, 0.10, 8, 16);
-  leftEye  = new THREE.Mesh(eyeGeo, eyeMat.clone());
-  rightEye = new THREE.Mesh(eyeGeo, eyeMat.clone());
-  leftEye.scale.set(1.0, EYE_BASE_Y, 0.22);
-  rightEye.scale.set(1.0, EYE_BASE_Y, 0.22);
-  leftEye.position.set(-0.32, 0.14, 0.64);
-  rightEye.position.set( 0.32, 0.14, 0.64);
-  faceGroup.add(leftEye, rightEye);
-
-  const hlMat  = new THREE.MeshBasicMaterial({ color: C.eyeShine });
-  const pxW = 1.0, pxH = 1/EYE_BASE_Y, pxD = 1/0.22;
-  const hlA = new THREE.BoxGeometry(0.072*pxW, 0.072*pxH, 0.015*pxD);
-  const hlB = new THREE.BoxGeometry(0.042*pxW, 0.042*pxH, 0.012*pxD);
-  for (const eye of [leftEye, rightEye]) {
-    const h1 = new THREE.Mesh(hlA, hlMat); h1.position.set(-0.05, 0.08, 0.20); eye.add(h1);
-    const h2 = new THREE.Mesh(hlB, hlMat); h2.position.set( 0.07,-0.06, 0.20); eye.add(h2);
-  }
-
-  const browMat = new THREE.MeshStandardMaterial({ color:C.brow, roughness:0.7 });
-  const browGeo = new THREE.CylinderGeometry(0.026, 0.026, 0.30, 12);
-  leftBrow  = new THREE.Mesh(browGeo, browMat.clone());
-  rightBrow = new THREE.Mesh(browGeo, browMat.clone());
-  leftBrow.position.set(-0.32, BROW_BASE_Y, 0.54);
-  rightBrow.position.set( 0.32, BROW_BASE_Y, 0.54);
-  faceGroup.add(leftBrow, rightBrow);
-
-  rebuildMouth(EXPR.NEUTRAL.mouthC);
+  rebuildMouth(cur?.mouthC ?? 0.08);
 }
 
 // ── Mouth ─────────────────────────────────────────────────────────────────────
 function rebuildMouth(curve) {
-  if (mouthMesh) { faceGroup.remove(mouthMesh); mouthMesh.geometry.dispose(); }
-  const y0 = -0.26, yc = y0 - curve * 0.24;
-  const path = new THREE.QuadraticBezierCurve3(
-    new THREE.Vector3(-0.18, y0, 0.70),
-    new THREE.Vector3(   0,  yc, 0.72),
-    new THREE.Vector3( 0.18, y0, 0.70)
-  );
-  mouthMesh = new THREE.Mesh(
-    new THREE.TubeGeometry(path, 20, 0.032, 8, false),
-    new THREE.MeshStandardMaterial({ color:C.mouth, emissive:0x080810, roughness:0.6 })
-  );
-  faceGroup.add(mouthMesh);
+  skinRebuildMouth?.(curve);
   lastMouthC = curve;
 }
 
@@ -377,6 +364,13 @@ function tick() {
   // Expression lerp
   const lerpK = expressionTimer ? 0.14 : 0.07;
   for (const k of LERP_KEYS) cur[k] = lerp(cur[k] ?? 0, tgt[k] ?? 0, lerpK);
+
+  // A skin swap may still be loading (e.g. fetching a .glb) — skip animating
+  // until its parts are wired up rather than throwing on undefined meshes.
+  if (!leftEye || !rightEye || !leftBrow || !rightBrow) {
+    renderer?.render(scene, camera);
+    return;
+  }
 
   leftEye.scale.set(1.0, EYE_BASE_Y * cur.eyeScY * blinkYL, 0.22);
   rightEye.scale.set(1.0, EYE_BASE_Y * cur.eyeScY * blinkYR, 0.22);
@@ -510,8 +504,8 @@ export function getFaceAPI() {
     },
     resetHeadColor() {
       _headColorOverride = null;
-      headMat?.color.set(C.head);
-      headMat?.emissive.set(C.headEmit);
+      headMat?.color.set(currentSkin.palette.head);
+      headMat?.emissive.set(currentSkin.palette.headEmit);
     },
     setBodyColor(hex) {
       _bodyColorOverride = hex;
@@ -521,8 +515,8 @@ export function getFaceAPI() {
     },
     resetBodyColor() {
       _bodyColorOverride = null;
-      bodyMat?.color.set(C.head);
-      bodyMat?.emissive.set(C.headEmit);
+      bodyMat?.color.set(currentSkin.palette.head);
+      bodyMat?.emissive.set(currentSkin.palette.headEmit);
     },
     setLeftEyeScale(v)  { _overrides.leftEyeScale  = Math.max(0, Number(v)); },
     setRightEyeScale(v) { _overrides.rightEyeScale = Math.max(0, Number(v)); },

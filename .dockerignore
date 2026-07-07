@@ -49,3 +49,9 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# Piper TTS is downloaded fresh during the image build (see Dockerfile)
+/vendor/piper
+
+# 3D skin models are downloaded fresh during the image build (see Dockerfile)
+/public/models/skins

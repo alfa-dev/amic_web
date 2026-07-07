@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Downloads free, permissively-licensed .glb models used as alternate Amic
+# skins (see public/js/skins/index.js). Run once from the project root:
+# bin/download_skins
+set -e
+
+DEST="${1:-public/models/skins}"
+mkdir -p "$DEST"
+
+declare -A MODELS=(
+  [RobotExpressive]="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/RobotExpressive/RobotExpressive.glb"
+  [Fox]="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb"
+  [Avocado]="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Avocado/glTF-Binary/Avocado.glb"
+  [BoomBox]="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/BoomBox/glTF-Binary/BoomBox.glb"
+  [Lantern]="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Lantern/glTF-Binary/Lantern.glb"
+)
+
+for name in "${!MODELS[@]}"; do
+  if [ ! -f "$DEST/$name.glb" ]; then
+    echo "→ Baixando skin $name..."
+    curl -fsSL "${MODELS[$name]}" -o "$DEST/$name.glb"
+  fi
+done
+
+echo ""
+echo "✓ Skins 3D prontas em $DEST"
+echo ""
+echo "Créditos (todas licenças permissivas, ver public/js/skins/index.js):"
+echo "  RobotExpressive — Tomás Laulhé, CC0 1.0"
+echo "  Fox             — PixelMannen, CC0 1.0 (modelo); tomkranis/@AsoboStudio/@scurest, CC BY 4.0 (rig/anim/conversão)"
+echo "  Avocado, BoomBox, Lantern — Microsoft / Frank Galligan, CC0 1.0 (Khronos glTF-Sample-Assets)"
