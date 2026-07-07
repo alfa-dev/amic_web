@@ -10,7 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_16_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_25_000001) do
+  create_table "amic_states", force: :cascade do |t|
+    t.text "code_library"
+    t.datetime "created_at", null: false
+    t.text "state_data"
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["user_id"], name: "index_amic_states_on_user_id", unique: true
+  end
+
   create_table "chat_sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "emotion_end"
@@ -64,6 +73,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_16_000003) do
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
+  add_foreign_key "amic_states", "users"
   add_foreign_key "chat_sessions", "users"
   add_foreign_key "face_profiles", "users"
   add_foreign_key "messages", "chat_sessions"

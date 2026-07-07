@@ -19,6 +19,7 @@ Rails.application.routes.draw do
   resources :app_settings, only: [:index, :update]
 
   namespace :api do
+    resource  :amic_state,   only: [:show, :update]
     resources :sessions, only: [:create, :update] do
       resources :messages, only: [:create]
     end
